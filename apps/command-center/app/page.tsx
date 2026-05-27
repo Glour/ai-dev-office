@@ -4,10 +4,10 @@ import {
   Archive,
   Bot,
   CheckCircle2,
-  CircleDot,
   ClipboardList,
   Database,
   FileText,
+  LayoutDashboard,
   Library,
   Plus,
   Route,
@@ -17,6 +17,19 @@ import { loadCommandCenterState } from "./lib/office";
 import type { AgentState, EventState, MaterialState, RouteRuleState, TaskState } from "./lib/types";
 
 export const dynamic = "force-dynamic";
+
+type View = "overview" | "tasks" | "agents" | "materials" | "routes" | "events";
+
+const basePath = process.env.NEXT_PUBLIC_COMMAND_CENTER_BASE_PATH ?? process.env.COMMAND_CENTER_BASE_PATH ?? "";
+
+const navItems: Array<{ view: View; label: string; description: string; icon: typeof Activity }> = [
+  { view: "overview", label: "Обзор", description: "Пульс офиса", icon: LayoutDashboard },
+  { view: "tasks", label: "Задачи", description: "Очередь и статусы", icon: ClipboardList },
+  { view: "agents", label: "Агенты", description: "Runtime gateway", icon: Bot },
+  { view: "materials", label: "Материалы", description: "База знаний", icon: Library },
+  { view: "routes", label: "Маршруты", description: "Процессы", icon: Route },
+  { view: "events", label: "Журнал", description: "События", icon: Database },
+];
 
 const statusLabels: Record<string, string> = {
   new: "новая",
@@ -64,9 +77,19 @@ function tone(status: string) {
   return "muted";
 }
 
-function StatCard({ icon: Icon, label: title, value, caption }: {
+function viewFromSearch(searchParams?: Record<string, string | string[] | undefined>): View {
+  const raw = searchParams?.view;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return navItems.some((item) => item.view === value) ? value as View : "overview";
+}
+
+function viewHref(view: View) {
+  return `${basePath || ""}/?view=${view}`;
+}
+
+function StatCard({ icon: Icon, title, value, caption }: {
   icon: typeof Activity;
-  label: string;
+  title: string;
   value: string | number;
   caption: string;
 }) {
@@ -82,240 +105,321 @@ function StatCard({ icon: Icon, label: title, value, caption }: {
   );
 }
 
-function AgentRow({ agent }: { agent: AgentState }) {
+function Sidebar({ activeView }: { activeView: View }) {
   return (
-    <article className="agent-row">
-      <div className={`status-dot ${tone(agent.status)}`} />
+    <aside className="office-sidebar">
+      <a className="office-brand" href={viewHref("overview")}>
+        <span>AI</span>
+        <div>
+          <strong>Dev Office</strong>
+          <small>Command Center</small>
+        </div>
+      </a>
+      <nav aria-label="Разделы центра управления">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <a href={viewHref(item.view)} className={activeView === item.view ? "is-active" : undefined} key={item.view}>
+              <Icon size={18} />
+              <span>{item.label}</span>
+              <small>{item.description}</small>
+            </a>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+function PageHeader({ activeView, connected, message }: { activeView: View; connected: boolean; message: string }) {
+  const current = navItems.find((item) => item.view === activeView) ?? navItems[0];
+  return (
+    <header className="page-header">
       <div>
-        <strong>{agent.name}</strong>
-        <span>{agent.department} · {agent.service}</span>
+        <span>AI Dev Office</span>
+        <h1>{current.label}</h1>
+        <p>{current.description}</p>
       </div>
-      <em>{label(agent.status)}{agent.pid ? ` · PID ${agent.pid}` : ""}</em>
-    </article>
-  );
-}
-
-function TaskCard({ task }: { task: TaskState }) {
-  return (
-    <article className="task-card">
-      <header>
-        <span className={`pill ${tone(task.status)}`}>{label(task.status)}</span>
-        <span className="text-muted">{formatDate(task.updatedAt)}</span>
-      </header>
-      <h3>{task.title}</h3>
-      <p>{task.ownerRequest}</p>
-      <footer>
-        <span>{task.routeType}</span>
-        <span>{task.agent}</span>
-        <span>{label(task.priority)}</span>
-      </footer>
-    </article>
-  );
-}
-
-function MaterialRow({ material }: { material: MaterialState }) {
-  return (
-    <article className="material-row">
-      <FileText size={18} />
-      <div>
-        <strong>{material.title}</strong>
-        <span>{label(material.type)} · v{material.version} · {material.storageUri}</span>
+      <div className={`connection ${connected ? "good" : "bad"}`}>
+        {connected ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+        <span>{message}</span>
       </div>
-      <em className={`pill ${tone(material.status)}`}>{label(material.status)}</em>
-    </article>
+    </header>
   );
 }
 
-function EventRow({ event }: { event: EventState }) {
+function AgentTable({ agents }: { agents: AgentState[] }) {
   return (
-    <article className="event-row">
-      <span>{formatDate(event.createdAt)}</span>
-      <strong>{event.actor}</strong>
-      <p>{event.message}</p>
-      <em className={`pill ${event.severity === "error" ? "bad" : event.severity === "warn" ? "work" : "muted"}`}>
-        {event.eventType}
-      </em>
-    </article>
+    <div className="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Агент</th>
+            <th>Отдел</th>
+            <th>Gateway</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {agents.map((agent) => (
+            <tr key={agent.id}>
+              <th scope="row">
+                <span className={`dot ${tone(agent.status)}`} />
+                {agent.name}
+              </th>
+              <td>{agent.department}</td>
+              <td>{agent.service}</td>
+              <td><span className={`pill ${tone(agent.status)}`}>{label(agent.status)}{agent.pid ? ` · ${agent.pid}` : ""}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function RouteRow({ route }: { route: RouteRuleState }) {
+function TaskTable({ tasks }: { tasks: TaskState[] }) {
   return (
-    <article className="route-row">
-      <Route size={17} />
-      <div>
-        <strong>{route.name}</strong>
-        <span>{route.department} → {route.primaryAgent}</span>
+    <div className="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Задача</th>
+            <th>Статус</th>
+            <th>Маршрут</th>
+            <th>Агент</th>
+            <th>Обновлена</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.id}>
+              <th scope="row">
+                <strong>{task.title}</strong>
+                <small>{task.ownerRequest}</small>
+              </th>
+              <td><span className={`pill ${tone(task.status)}`}>{label(task.status)}</span></td>
+              <td>{task.routeType}</td>
+              <td>{task.agent}</td>
+              <td>{formatDate(task.updatedAt)}</td>
+            </tr>
+          ))}
+          {tasks.length === 0 ? <tr><td colSpan={5}>Задач пока нет.</td></tr> : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MaterialTable({ materials }: { materials: MaterialState[] }) {
+  return (
+    <div className="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Материал</th>
+            <th>Тип</th>
+            <th>Статус</th>
+            <th>Хранилище</th>
+          </tr>
+        </thead>
+        <tbody>
+          {materials.map((material) => (
+            <tr key={material.id}>
+              <th scope="row">
+                <strong>{material.title}</strong>
+                <small>v{material.version} · {formatDate(material.updatedAt)}</small>
+              </th>
+              <td>{label(material.type)}</td>
+              <td><span className={`pill ${tone(material.status)}`}>{label(material.status)}</span></td>
+              <td>{material.storageUri}</td>
+            </tr>
+          ))}
+          {materials.length === 0 ? <tr><td colSpan={4}>Библиотека пока пустая.</td></tr> : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RouteTable({ routes }: { routes: RouteRuleState[] }) {
+  return (
+    <div className="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Маршрут</th>
+            <th>Отдел</th>
+            <th>Исполнитель</th>
+            <th>Контроль</th>
+          </tr>
+        </thead>
+        <tbody>
+          {routes.map((route) => (
+            <tr key={route.routeType}>
+              <th scope="row">
+                <strong>{route.name}</strong>
+                <small>{route.routeType}</small>
+              </th>
+              <td>{route.department}</td>
+              <td>{route.primaryAgent}</td>
+              <td>{route.qcRequired ? "QC" : "без QC"}{route.approvalRequired ? " · approval" : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EventTable({ events }: { events: EventState[] }) {
+  return (
+    <div className="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Актор</th>
+            <th>Событие</th>
+            <th>Тип</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((event) => (
+            <tr key={event.id}>
+              <td>{formatDate(event.createdAt)}</td>
+              <td>{event.actor}</td>
+              <td>{event.message}</td>
+              <td><span className={`pill ${event.severity === "error" ? "bad" : event.severity === "warn" ? "work" : "muted"}`}>{event.eventType}</span></td>
+            </tr>
+          ))}
+          {events.length === 0 ? <tr><td colSpan={4}>Событий пока нет.</td></tr> : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentState[] }) {
+  return (
+    <form className="control-form" action={`${basePath}/api/tasks`} method="post">
+      <textarea name="ownerRequest" rows={5} placeholder="Сформулировать задачу для офиса..." aria-label="Описание задачи" required />
+      <div className="control-grid">
+        <select name="routeType" defaultValue="feature_development" aria-label="Маршрут">
+          {routes.length > 0 ? routes.map((route) => <option value={route.routeType} key={route.routeType}>{route.name}</option>) : null}
+          {routes.length === 0 ? <option value="feature_development">Feature development</option> : null}
+        </select>
+        <select name="assignedDepartment" defaultValue="development" aria-label="Отдел">
+          <option value="management">Management</option>
+          <option value="development">Development</option>
+          <option value="quality-control">Quality Control</option>
+          <option value="materials-library">Materials Library</option>
+        </select>
+        <select name="assignedAgent" defaultValue="dev-builder" aria-label="Агент">
+          {agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
+        </select>
+        <select name="priority" defaultValue="normal" aria-label="Приоритет">
+          <option value="low">Низкий</option>
+          <option value="normal">Обычный</option>
+          <option value="high">Высокий</option>
+          <option value="urgent">Срочный</option>
+        </select>
+        <input type="hidden" name="riskLevel" value="medium" />
+        <button type="submit"><Plus size={16} /> Создать</button>
       </div>
-      <em>{route.qcRequired ? "QC" : "без QC"}{route.approvalRequired ? " · approve" : ""}</em>
-    </article>
+    </form>
   );
 }
 
-export default async function CommandCenterPage() {
+function MaterialForm() {
+  return (
+    <form className="control-form compact" action={`${basePath}/api/materials`} method="post">
+      <input name="title" placeholder="Название материала" aria-label="Название материала" required />
+      <input name="storageUri" placeholder="Ссылка или путь к файлу" aria-label="Ссылка или путь к файлу" required />
+      <select name="materialType" defaultValue="instruction" aria-label="Тип материала">
+        <option value="instruction">Инструкция</option>
+        <option value="report">Отчет</option>
+        <option value="brief">Бриф</option>
+        <option value="document">Документ</option>
+      </select>
+      <select name="status" defaultValue="draft" aria-label="Статус материала">
+        <option value="draft">Черновик</option>
+        <option value="verified">Проверено</option>
+      </select>
+      <textarea name="sourceSummary" rows={3} placeholder="Коротко: зачем этот материал нужен" aria-label="Краткое описание материала" />
+      <button type="submit"><Plus size={16} /> Добавить</button>
+    </form>
+  );
+}
+
+export default async function CommandCenterPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const activeView = viewFromSearch(params);
   const state = await loadCommandCenterState();
   const openTasks = state.tasks.filter((task) => !["done", "cancelled", "failed"].includes(task.status));
-  const latestTasks = state.tasks.slice(0, 8);
-  const latestMaterials = state.materials.slice(0, 8);
-  const latestEvents = state.events.slice(0, 10);
 
   return (
     <main className="office-shell">
-      <aside className="side-rail" aria-label="Навигация">
-        <div className="brand-mark">AO</div>
-        <a href="#overview" aria-label="Обзор"><Activity size={20} /></a>
-        <a href="#tasks" aria-label="Задачи"><ClipboardList size={20} /></a>
-        <a href="#agents" aria-label="Агенты"><Bot size={20} /></a>
-        <a href="#materials" aria-label="Материалы"><Library size={20} /></a>
-        <a href="#events" aria-label="События"><Database size={20} /></a>
-      </aside>
+      <Sidebar activeView={activeView} />
+      <section className="office-content">
+        <PageHeader activeView={activeView} connected={state.database.connected} message={state.database.message} />
 
-      <section className="workspace">
-        <header className="topbar">
-          <div>
-            <p>AI Dev Office</p>
-            <h1>Центр управления</h1>
+        {activeView === "overview" ? (
+          <div className="view-stack">
+            <section className="metrics">
+              <StatCard icon={Bot} title="Агенты" value={`${state.totals.activeAgents}/${state.agents.length}`} caption="активных gateway" />
+              <StatCard icon={ClipboardList} title="Открытые задачи" value={state.totals.openTasks} caption={`${openTasks.length} требуют движения`} />
+              <StatCard icon={Library} title="Материалы" value={state.totals.materials} caption="в библиотеке" />
+              <StatCard icon={ShieldCheck} title="QC ошибки" value={state.totals.failedQc} caption="по последним проверкам" />
+            </section>
+            <section className="split-grid">
+              <div className="panel">
+                <div className="panel-head"><h2>Последние задачи</h2><ClipboardList size={18} /></div>
+                <TaskTable tasks={state.tasks.slice(0, 5)} />
+              </div>
+              <div className="panel">
+                <div className="panel-head"><h2>Агенты</h2><Bot size={18} /></div>
+                <AgentTable agents={state.agents} />
+              </div>
+            </section>
           </div>
-          <div className={`connection ${state.database.connected ? "good" : "bad"}`}>
-            {state.database.connected ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-            <span>{state.database.message}</span>
+        ) : null}
+
+        {activeView === "tasks" ? (
+          <div className="view-stack">
+            <section className="panel">
+              <div className="panel-head"><h2>Новая задача</h2><Plus size={18} /></div>
+              <TaskForm routes={state.routes} agents={state.agents} />
+            </section>
+            <section className="panel">
+              <div className="panel-head"><h2>Очередь задач</h2><ClipboardList size={18} /></div>
+              <TaskTable tasks={state.tasks} />
+            </section>
           </div>
-        </header>
+        ) : null}
 
-        <section className="metrics" id="overview">
-          <StatCard icon={Bot} label="Агенты" value={`${state.totals.activeAgents}/${state.agents.length}`} caption="активных gateway" />
-          <StatCard icon={ClipboardList} label="Открытые задачи" value={state.totals.openTasks} caption={`${openTasks.length} требуют движения`} />
-          <StatCard icon={Library} label="Материалы" value={state.totals.materials} caption="в библиотеке" />
-          <StatCard icon={ShieldCheck} label="QC ошибки" value={state.totals.failedQc} caption="по последним проверкам" />
-        </section>
+        {activeView === "agents" ? (
+          <section className="panel"><div className="panel-head"><h2>Runtime агентов</h2><Bot size={18} /></div><AgentTable agents={state.agents} /></section>
+        ) : null}
 
-        <section className="main-grid">
-          <section className="panel task-panel" id="tasks">
-            <div className="panel-head">
-              <div>
-                <span>Очередь</span>
-                <h2>Задачи</h2>
-              </div>
-              <CircleDot size={18} />
-            </div>
+        {activeView === "materials" ? (
+          <div className="view-stack">
+            <section className="panel"><div className="panel-head"><h2>Добавить материал</h2><Archive size={18} /></div><MaterialForm /></section>
+            <section className="panel"><div className="panel-head"><h2>Библиотека материалов</h2><FileText size={18} /></div><MaterialTable materials={state.materials} /></section>
+          </div>
+        ) : null}
 
-            <form className="quick-form" action="/api/tasks" method="post">
-              <textarea name="ownerRequest" rows={4} placeholder="Сформулировать задачу для офиса..." aria-label="Описание задачи" required />
-              <div className="form-grid">
-                <select name="routeType" defaultValue="feature_development" aria-label="Маршрут">
-                  {state.routes.length > 0 ? state.routes.map((route) => (
-                    <option value={route.routeType} key={route.routeType}>{route.name}</option>
-                  )) : (
-                    <>
-                      <option value="feature_development">Feature development</option>
-                      <option value="bugfix">Bug fix</option>
-                      <option value="qa_review">QA review</option>
-                      <option value="material_save">Material save</option>
-                    </>
-                  )}
-                </select>
-                <select name="assignedDepartment" defaultValue="development" aria-label="Отдел">
-                  <option value="management">Management</option>
-                  <option value="development">Development</option>
-                  <option value="quality-control">Quality Control</option>
-                  <option value="materials-library">Materials Library</option>
-                </select>
-                <select name="assignedAgent" defaultValue="dev-builder" aria-label="Агент">
-                  {state.agents.map((agent) => (
-                    <option value={agent.id} key={agent.id}>{agent.name}</option>
-                  ))}
-                </select>
-                <select name="priority" defaultValue="normal" aria-label="Приоритет">
-                  <option value="low">Низкий</option>
-                  <option value="normal">Обычный</option>
-                  <option value="high">Высокий</option>
-                  <option value="urgent">Срочный</option>
-                </select>
-                <input type="hidden" name="riskLevel" value="medium" />
-                <button type="submit"><Plus size={17} /> Создать</button>
-              </div>
-            </form>
+        {activeView === "routes" ? (
+          <section className="panel"><div className="panel-head"><h2>Route matrix</h2><Route size={18} /></div><RouteTable routes={state.routes} /></section>
+        ) : null}
 
-            <div className="task-list">
-              {latestTasks.length > 0 ? latestTasks.map((task) => <TaskCard task={task} key={task.id} />) : (
-                <p className="empty-state">Задач пока нет. Создай первую задачу выше.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="panel" id="agents">
-            <div className="panel-head">
-              <div>
-                <span>Runtime</span>
-                <h2>Агенты</h2>
-              </div>
-              <Bot size={18} />
-            </div>
-            <div className="agent-list">
-              {state.agents.map((agent) => <AgentRow agent={agent} key={agent.id} />)}
-            </div>
-          </section>
-        </section>
-
-        <section className="lower-grid">
-          <section className="panel" id="materials">
-            <div className="panel-head">
-              <div>
-                <span>База знаний</span>
-                <h2>Материалы</h2>
-              </div>
-              <Archive size={18} />
-            </div>
-            <form className="material-form" action="/api/materials" method="post">
-              <input name="title" placeholder="Название материала" aria-label="Название материала" required />
-              <input name="storageUri" placeholder="Ссылка или путь к файлу" aria-label="Ссылка или путь к файлу" required />
-              <select name="materialType" defaultValue="instruction" aria-label="Тип материала">
-                <option value="instruction">Инструкция</option>
-                <option value="report">Отчет</option>
-                <option value="brief">Бриф</option>
-                <option value="document">Документ</option>
-              </select>
-              <select name="status" defaultValue="draft" aria-label="Статус материала">
-                <option value="draft">Черновик</option>
-                <option value="verified">Проверено</option>
-              </select>
-              <textarea name="sourceSummary" rows={2} placeholder="Коротко: зачем этот материал нужен" aria-label="Краткое описание материала" />
-              <button type="submit"><Plus size={17} /> Добавить</button>
-            </form>
-            <div className="material-list">
-              {latestMaterials.length > 0 ? latestMaterials.map((material) => <MaterialRow material={material} key={material.id} />) : (
-                <p className="empty-state">Библиотека пустая. Добавь ссылку, файл или инструкцию.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="panel route-panel">
-            <div className="panel-head">
-              <div>
-                <span>Маршруты</span>
-                <h2>Процессы</h2>
-              </div>
-              <Route size={18} />
-            </div>
-            <div className="route-list">
-              {state.routes.map((route) => <RouteRow route={route} key={route.routeType} />)}
-              {state.routes.length === 0 ? <p className="empty-state">Route matrix появится после подключения Postgres.</p> : null}
-            </div>
-          </section>
-
-          <section className="panel event-panel" id="events">
-            <div className="panel-head">
-              <div>
-                <span>Журнал</span>
-                <h2>События</h2>
-              </div>
-              <Database size={18} />
-            </div>
-            <div className="event-list">
-              {latestEvents.map((event) => <EventRow event={event} key={event.id} />)}
-            </div>
-          </section>
-        </section>
+        {activeView === "events" ? (
+          <section className="panel"><div className="panel-head"><h2>Журнал событий</h2><Database size={18} /></div><EventTable events={state.events} /></section>
+        ) : null}
       </section>
     </main>
   );

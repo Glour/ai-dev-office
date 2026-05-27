@@ -19,6 +19,7 @@ Type=simple
 WorkingDirectory=$root/apps/command-center
 Environment=NODE_ENV=production
 Environment=COMMAND_CENTER_PORT=$port
+Environment=COMMAND_CENTER_BASE_PATH=${COMMAND_CENTER_BASE_PATH:-}
 Environment=HERMES_RUNTIME_HOME=${HERMES_RUNTIME_HOME:-$HOME/.hermes-ai-dev-office}
 Environment=POSTGRES_HOST=${POSTGRES_HOST:-127.0.0.1}
 Environment=POSTGRES_PORT=${POSTGRES_PORT:-5432}
