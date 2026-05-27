@@ -5,10 +5,10 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/usr/local/lib/hermes-agent
-Environment="HERMES_HOME=/root/.hermes-ai-dev-office"
-Environment="HERMES_AUTH_STORE=/root/.hermes/auth.json"
+Environment="HERMES_HOME=%h/.hermes-ai-dev-office"
+Environment="HERMES_AUTH_STORE=%h/.hermes/auth.json"
 Environment="HERMES_REDACT_SECRETS=true"
-Environment="AI_DEV_OFFICE_REPO=/root/home/ai-dev-office"
+Environment="AI_DEV_OFFICE_REPO=%h/home/ai-dev-office"
 ExecStart=/usr/local/lib/hermes-agent/venv/bin/python -m hermes_cli.main --profile %i gateway run --replace
 Restart=on-failure
 RestartSec=5

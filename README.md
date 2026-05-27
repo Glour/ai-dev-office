@@ -48,6 +48,16 @@ docker compose up -d postgres
 docker compose exec postgres psql -U ai_dev_office -d ai_dev_office -c "select count(*) from route_rules;"
 ```
 
+Deploy Hermes profiles on a server:
+
+```bash
+scripts/bootstrap-hermes.sh
+scripts/start-agents.sh
+scripts/status-agents.sh
+```
+
+See [RUNBOOK.md](RUNBOOK.md) for the full deployment and operations flow.
+
 Run the QA tool:
 
 ```bash
@@ -81,3 +91,16 @@ Hermes agents may:
 - summarize results.
 
 Hermes agents must not bypass Codex CLI for code writing or code review.
+
+## Hermes Profile Runtime
+
+The office uses one Hermes installation and multiple profile runtimes. In production, each profile should run as its own gateway process via systemd:
+
+```text
+hermes-gateway-ai-dev-office@owner-assistant.service
+hermes-gateway-ai-dev-office@orchestrator.service
+hermes-gateway-ai-dev-office@dev-builder.service
+...
+```
+
+This lets each agent keep its own Telegram bot, queue, memory, sessions, and logs while still sharing the same office repo and Hermes installation.
