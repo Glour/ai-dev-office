@@ -4,7 +4,9 @@ import {
   Archive,
   Bot,
   CheckCircle2,
+  CircleDot,
   ClipboardList,
+  Columns3,
   Database,
   FileText,
   LayoutDashboard,
@@ -136,7 +138,7 @@ function PageHeader({ activeView, connected, message }: { activeView: View; conn
   return (
     <header className="page-header">
       <div>
-        <span>AI Dev Office</span>
+        <span>Живой офис агентов</span>
         <h1>{current.label}</h1>
         <p>{current.description}</p>
       </div>
@@ -145,6 +147,88 @@ function PageHeader({ activeView, connected, message }: { activeView: View; conn
         <span>{message}</span>
       </div>
     </header>
+  );
+}
+
+const boardColumns = [
+  { id: "planned", title: "План", hint: "сформулированы и ждут движения", states: ["new", "planned"] },
+  { id: "work", title: "В работе", hint: "исполнитель уже подключен", states: ["running"] },
+  { id: "review", title: "Review", hint: "код, логика или результат на проверке", states: ["review"] },
+  { id: "qc", title: "QC", hint: "финальный контроль качества", states: ["qc"] },
+  { id: "done", title: "Готово", hint: "закрытые и отданные результаты", states: ["done", "verified"] },
+  { id: "blocked", title: "Блокеры", hint: "нужна реакция владельца", states: ["blocked", "failed"] },
+];
+
+function TaskBoard({ tasks }: { tasks: TaskState[] }) {
+  return (
+    <div className="board-shell" aria-label="Доска задач">
+      <div className="board-tabs">
+        {boardColumns.map((column) => {
+          const count = tasks.filter((task) => column.states.includes(task.status)).length;
+          return (
+            <a href={`#column-${column.id}`} key={column.id}>
+              {column.title}
+              <span>{count}</span>
+            </a>
+          );
+        })}
+      </div>
+      <div className="board-grid">
+        {boardColumns.map((column) => {
+          const columnTasks = tasks.filter((task) => column.states.includes(task.status));
+          return (
+            <section className="board-column" id={`column-${column.id}`} key={column.id}>
+              <header>
+                <div>
+                  <h3>{column.title}</h3>
+                  <p>{column.hint}</p>
+                </div>
+                <span>{columnTasks.length}</span>
+              </header>
+              <div className="board-cards">
+                {columnTasks.length === 0 ? (
+                  <div className="empty-card">
+                    <CircleDot size={16} />
+                    <span>Пусто</span>
+                  </div>
+                ) : null}
+                {columnTasks.map((task) => (
+                  <article className="task-card" key={task.id}>
+                    <div className="task-card-top">
+                      <span className={`pill ${tone(task.status)}`}>{label(task.status)}</span>
+                      <small>{formatDate(task.updatedAt)}</small>
+                    </div>
+                    <h4>{task.title}</h4>
+                    <p>{task.ownerRequest}</p>
+                    <footer>
+                      <span>{task.agent}</span>
+                      <span>{label(task.priority)}</span>
+                    </footer>
+                  </article>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AgentRoster({ agents }: { agents: AgentState[] }) {
+  return (
+    <div className="agent-roster">
+      {agents.map((agent) => (
+        <article className="agent-row" key={agent.id}>
+          <span className={`dot ${tone(agent.status)}`} />
+          <div>
+            <strong>{agent.name}</strong>
+            <small>{agent.department} · {agent.service}</small>
+          </div>
+          <span className={`pill ${tone(agent.status)}`}>{label(agent.status)}{agent.pid ? ` · PID ${agent.pid}` : ""}</span>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -378,12 +462,12 @@ export default async function CommandCenterPage({
             </section>
             <section className="split-grid">
               <div className="panel">
-                <div className="panel-head"><h2>Последние задачи</h2><ClipboardList size={18} /></div>
-                <TaskTable tasks={state.tasks.slice(0, 5)} />
+                <div className="panel-head"><h2>Доска задач</h2><Columns3 size={18} /></div>
+                <TaskBoard tasks={state.tasks} />
               </div>
               <div className="panel">
                 <div className="panel-head"><h2>Агенты</h2><Bot size={18} /></div>
-                <AgentTable agents={state.agents} />
+                <AgentRoster agents={state.agents} />
               </div>
             </section>
           </div>
@@ -396,7 +480,11 @@ export default async function CommandCenterPage({
               <TaskForm routes={state.routes} agents={state.agents} />
             </section>
             <section className="panel">
-              <div className="panel-head"><h2>Очередь задач</h2><ClipboardList size={18} /></div>
+              <div className="panel-head"><h2>Очередь задач</h2><Columns3 size={18} /></div>
+              <TaskBoard tasks={state.tasks} />
+            </section>
+            <section className="panel">
+              <div className="panel-head"><h2>Таблица задач</h2><ClipboardList size={18} /></div>
               <TaskTable tasks={state.tasks} />
             </section>
           </div>
