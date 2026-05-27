@@ -1,0 +1,13 @@
+route_type: material_save
+required_inputs:
+  - passed_qc_result
+  - artifact_uri
+  - material_title
+steps:
+  - agent: materials-librarian
+    action: create or increment material version
+  - agent: materials-librarian
+    action: link task, artifact, and qc result
+done_when:
+  - material record exists
+  - owner-facing retrieval note exists

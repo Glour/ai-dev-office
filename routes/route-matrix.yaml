@@ -1,0 +1,60 @@
+routes:
+  feature_development:
+    department: development
+    owner_outcome: implemented and reviewed code change
+    primary_agent: dev-builder
+    flow:
+      - orchestrator
+      - dev-builder
+      - deterministic-checks
+      - dev-reviewer
+      - qa-lead
+      - materials-librarian
+      - owner-assistant
+    qc_gate: code-and-acceptance
+    approval: by-risk
+  bugfix:
+    department: development
+    owner_outcome: verified bug fix
+    primary_agent: dev-builder
+    flow:
+      - orchestrator
+      - dev-builder
+      - regression-check
+      - dev-reviewer
+      - qa-lead
+      - owner-assistant
+    qc_gate: regression
+    approval: by-risk
+  qa_review:
+    department: quality-control
+    owner_outcome: pass/fail/blocker decision
+    primary_agent: qa-lead
+    flow:
+      - qa-lead
+      - universal-qa
+      - qc-result
+    qc_gate: browser-and-deterministic
+    approval: no
+  material_save:
+    department: materials-library
+    owner_outcome: versioned material
+    primary_agent: materials-librarian
+    flow:
+      - materials-librarian
+      - storage
+      - owner-assistant
+    qc_gate: require-existing-pass
+    approval: no
+  daily_audit:
+    department: quality-control
+    owner_outcome: improvement report
+    primary_agent: daily-auditor
+    flow:
+      - daily-auditor
+      - incidents
+      - events
+      - qc-results
+      - improvement-tasks
+    qc_gate: none
+    approval: before-route-change

@@ -1,0 +1,13 @@
+route_type: qa_review
+required_inputs:
+  - artifact_or_target
+  - acceptance_criteria
+steps:
+  - agent: qa-lead
+    action: choose deterministic checks
+  - agent: qa-lead
+    action: run universal QA when web UI is involved
+  - agent: qa-lead
+    action: write qc_results
+done_when:
+  - qc decision is passed, failed, or blocked

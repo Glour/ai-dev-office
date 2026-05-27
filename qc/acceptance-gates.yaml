@@ -1,0 +1,26 @@
+gates:
+  code-and-acceptance:
+    required:
+      - codex_run_artifact
+      - codex_review_artifact
+      - deterministic_checks
+      - changed_files_summary
+    decision_values:
+      - passed
+      - failed
+      - blocked
+  regression:
+    required:
+      - reproduction_notes
+      - fix_artifact
+      - regression_check_output
+  browser-and-deterministic:
+    required:
+      - universal_qa_report
+      - console_network_summary
+      - screenshots
+  require-existing-pass:
+    required:
+      - qc_result_id
+      - artifact_uri
+      - material_metadata

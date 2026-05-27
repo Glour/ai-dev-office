@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "name": "Example site QA",
+  "baseUrl": "https://example.com",
+  "artifactDir": "../artifacts/universal-qa",
+  "viewports": [
+    { "name": "desktop", "width": 1440, "height": 900 },
+    { "name": "tablet", "width": 1024, "height": 768 },
+    { "name": "mobile", "width": 390, "height": 844 }
+  ],
+  "waitForSelectors": ["main", "body"],
+  "defaultChecks": [
+    "expected-text",
+    "forbidden-text",
+    "console-clean",
+    "pageerror-clean",
+    "http-status-ok",
+    "network-clean",
+    "no-page-overflow",
+    "form-controls-visible",
+    "buttons-have-names",
+    "inputs-have-labels",
+    "broken-images",
+    "basic-seo",
+    "landmarks",
+    "aria-smoke",
+    "links-valid",
+    "performance-budget"
+  ],
+  "network": {
+    "ignoreUrlPatterns": ["analytics", "googletagmanager"],
+    "severity": "fail"
+  },
+  "links": {
+    "includeExternal": false,
+    "maxSamples": 20,
+    "severity": "warn"
+  },
+  "seo": {
+    "requireDescription": false,
+    "forbidNoindex": true
+  },
+  "performance": {
+    "maxDomContentLoadedMs": 5000,
+    "maxLoadMs": 8000,
+    "maxTransferKb": 2048,
+    "maxResourceCount": 120
+  },
+  "globalForbiddenText": ["TODO", "FIXME", "undefined", "NaN"],
+  "tooltip": {
+    "required": false,
+    "triggerSelector": "[data-qa-tooltip], [aria-describedby], .xone-field-info",
+    "tooltipSelector": "[role=tooltip], .tooltip, .xone-field-info-portal-tooltip",
+    "minZIndex": 1000,
+    "maxSamples": 8
+  },
+  "pages": [
+    {
+      "id": "home",
+      "title": "Главная",
+      "path": "/",
+      "expectedText": ["Example Domain"],
+      "landmarks": { "requireMain": false },
+      "checks": ["no-visible-overlap", "focus-visible"]
+    }
+  ],
+  "apiProofs": [
+    {
+      "name": "homepage responds",
+      "method": "GET",
+      "path": "/",
+      "allowedStatus": [200],
+      "expectedText": "Example Domain",
+      "maxMs": 5000
+    }
+  ]
+}

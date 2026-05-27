@@ -1,0 +1,59 @@
+office:
+  id: ai-dev-office
+  name: AI Dev Office
+  version: 0.1.0
+  runtime_home: /root/.hermes-ai-dev-office
+  repo_runtime_path: /root/home/ai-dev-office
+  owner_entrypoint: owner-assistant
+  canonical_state: postgres
+
+departments:
+  - id: development
+    name: Development Department
+    mission: Produce safe code changes through Codex CLI, deterministic checks, and review.
+  - id: quality-control
+    name: Quality Control Department
+    mission: Prevent unverified, broken, risky, or low-quality results from reaching the owner.
+  - id: materials-library
+    name: Materials Library
+    mission: Store verified results, artifacts, reports, decisions, and reusable materials.
+
+agents:
+  - id: owner-assistant
+    department: management
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: orchestrator
+    department: management
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: dev-builder
+    department: development
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: dev-reviewer
+    department: development
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: qa-lead
+    department: quality-control
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: materials-librarian
+    department: materials-library
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: daily-auditor
+    department: quality-control
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+
+tools:
+  codex_cli:
+    path: tools/codex-cli
+    required_for:
+      - code_write
+      - code_review
+      - bugfix
+      - refactor
+  universal_qa:
+    path: tools/universal-qa
+    required_for:
+      - browser_acceptance
+      - ui_smoke
+  n8n_adapter:
+    path: tools/n8n-adapter
+    status: contract_only

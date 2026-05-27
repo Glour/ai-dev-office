@@ -1,0 +1,24 @@
+route_type: bugfix
+trigger_examples:
+  - "fix bug"
+  - "broken"
+  - "error in production"
+required_inputs:
+  - observed_problem
+  - reproduction_steps
+  - expected_behavior
+steps:
+  - agent: orchestrator
+    action: classify failure and create task
+  - agent: dev-builder
+    action: use Codex CLI to implement minimal fix
+  - agent: dev-builder
+    action: run regression checks
+  - agent: dev-reviewer
+    action: review fix and risk
+  - agent: qa-lead
+    action: pass/fail/block
+done_when:
+  - reproduction is addressed or blocker is documented
+  - regression check is recorded
+  - qc result exists

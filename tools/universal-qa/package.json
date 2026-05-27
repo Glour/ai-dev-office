@@ -1,0 +1,20 @@
+{
+  "name": "ai-dev-office-universal-qa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Config-driven browser acceptance QA agent for production and local web apps.",
+  "bin": {
+    "universal-qa": "./bin/universal-qa.mjs",
+    "universal-qa-capture-session": "./bin/capture-session.mjs"
+  },
+  "scripts": {
+    "qa": "node ./bin/universal-qa.mjs",
+    "qa:example": "node ./bin/universal-qa.mjs ./configs/example-site.json --no-strict",
+    "capture-session": "node ./bin/capture-session.mjs",
+    "list-checks": "node ./bin/universal-qa.mjs --list-checks"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

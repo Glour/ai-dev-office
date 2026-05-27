@@ -1,0 +1,18 @@
+model:
+  provider: openai-codex
+  default: gpt-5.5
+agent:
+  reasoning_effort: xhigh
+  gateway_timeout: 1800
+  max_turns: 200
+display:
+  busy_input_mode: queue
+  busy_ack_enabled: true
+  status_messages: false
+security:
+  redact_secrets: true
+office:
+  role: dev-builder
+  repo: /root/home/ai-dev-office
+  state: postgres
+  required_tool: tools/codex-cli/run-codex-task.sh

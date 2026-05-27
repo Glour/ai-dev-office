@@ -1,0 +1,26 @@
+route_type: feature_development
+trigger_examples:
+  - "build a feature"
+  - "add behavior"
+  - "implement this"
+required_inputs:
+  - target_repository
+  - desired_behavior
+  - acceptance_criteria
+steps:
+  - agent: orchestrator
+    action: create task and Codex task brief
+  - agent: dev-builder
+    action: run tools/codex-cli/run-codex-task.sh
+  - agent: dev-builder
+    action: run project tests/lint/build if available
+  - agent: dev-reviewer
+    action: run tools/codex-cli/review-codex-task.sh
+  - agent: qa-lead
+    action: record qc_results
+  - agent: materials-librarian
+    action: store report and artifacts when passed
+done_when:
+  - code artifact exists
+  - review artifact exists
+  - qc_results.status is passed or blocked
