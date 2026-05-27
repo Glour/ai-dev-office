@@ -223,7 +223,7 @@ function AgentRoster({ agents }: { agents: AgentState[] }) {
           <span className={`dot ${tone(agent.status)}`} />
           <div>
             <strong>{agent.name}</strong>
-            <small>{agent.department} · {agent.service}</small>
+            <small>{agent.department}{agent.lastEvent ? ` · ${formatDate(agent.lastEvent)}` : ""}</small>
           </div>
           <span className={`pill ${tone(agent.status)}`}>{label(agent.status)}{agent.pid ? ` · PID ${agent.pid}` : ""}</span>
         </article>
