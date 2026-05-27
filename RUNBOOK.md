@@ -187,6 +187,49 @@ scripts/status-agents.sh
 scripts/logs-agent.sh orchestrator
 ```
 
+## Command Center
+
+Command Center — простой визуальный центр управления офисом:
+
+- создание задач;
+- список задач и статусов;
+- состояние Hermes gateway по агентам;
+- добавление материалов в библиотеку;
+- последние события;
+- route matrix.
+
+Установка зависимостей и сборка:
+
+```bash
+npm --prefix apps/command-center install
+npm --prefix apps/command-center run build
+```
+
+Запуск через user systemd:
+
+```bash
+scripts/start-command-center.sh
+```
+
+Проверка:
+
+```bash
+scripts/status-command-center.sh
+curl -fsS http://127.0.0.1:${COMMAND_CENTER_PORT:-3310}/api/state
+```
+
+Переменные:
+
+```text
+COMMAND_CENTER_PORT=3310
+HERMES_RUNTIME_HOME=/root/.hermes-ai-dev-office
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_DB=ai_dev_office
+POSTGRES_USER=ai_dev_office
+POSTGRES_PASSWORD=change-me
+```
+
 ## Postgres
 
 ```bash

@@ -1,0 +1,75 @@
+export type AgentState = {
+  id: string;
+  name: string;
+  department: string;
+  service: string;
+  status: "active" | "inactive" | "unknown";
+  pid?: string;
+  currentTask?: string;
+  queueSize?: number;
+  lastEvent?: string;
+};
+
+export type TaskState = {
+  id: string;
+  title: string;
+  ownerRequest: string;
+  status: string;
+  routeType: string;
+  department: string;
+  agent: string;
+  priority: string;
+  riskLevel: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MaterialState = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  version: number;
+  storageUri: string;
+  sourceSummary?: string;
+  updatedAt: string;
+};
+
+export type EventState = {
+  id: string;
+  taskId?: string;
+  eventType: string;
+  actor: string;
+  severity: string;
+  message: string;
+  createdAt: string;
+};
+
+export type RouteRuleState = {
+  routeType: string;
+  name: string;
+  department: string;
+  primaryAgent: string;
+  qcRequired: boolean;
+  approvalRequired: boolean;
+};
+
+export type CommandCenterState = {
+  mode: "live" | "fallback";
+  checkedAt: string;
+  database: {
+    connected: boolean;
+    message: string;
+  };
+  totals: {
+    activeAgents: number;
+    openTasks: number;
+    materials: number;
+    failedQc: number;
+  };
+  agents: AgentState[];
+  tasks: TaskState[];
+  materials: MaterialState[];
+  events: EventState[];
+  routes: RouteRuleState[];
+};

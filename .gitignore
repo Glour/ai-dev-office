@@ -2,6 +2,7 @@
 .env
 *.log
 node_modules/
+.next/
 artifacts/
 dist/
 coverage/

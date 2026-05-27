@@ -1,0 +1,10 @@
+{
+  "name": "ai-dev-office",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "command-center:dev": "npm --prefix apps/command-center run dev",
+    "command-center:build": "npm --prefix apps/command-center run build",
+    "command-center:start": "npm --prefix apps/command-center run start"
+  }
+}

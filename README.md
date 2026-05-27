@@ -60,6 +60,16 @@ scripts/status-agents.sh
 
 Полный сценарий развертывания описан в [RUNBOOK.md](RUNBOOK.md).
 
+Command Center:
+
+```bash
+npm --prefix apps/command-center install
+npm --prefix apps/command-center run build
+scripts/start-command-center.sh
+```
+
+По умолчанию интерфейс слушает `127.0.0.1/0.0.0.0:3310` через Next и читает тот же Postgres, что и офис.
+
 Provider auth для Hermes проверяется отдельно:
 
 ```bash
