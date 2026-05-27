@@ -50,10 +50,15 @@ export async function queryRows<T>(sql: string, params: unknown[] = []): Promise
 async function serviceStatus(agentId: string): Promise<Pick<AgentState, "status" | "pid">> {
   const service = `hermes-gateway-ai-dev-office@${agentId}.service`;
   try {
-    const { stdout } = await execFileAsync("systemctl", ["--user", "show", service, "--property=ActiveState,MainPID", "--value"], {
+    const { stdout } = await execFileAsync("systemctl", ["--user", "show", service, "--property=ActiveState,MainPID"], {
       timeout: 1200,
     });
-    const [activeState = "", pid = ""] = stdout.trim().split("\n");
+    const values = new Map(stdout.trim().split("\n").map((line) => {
+      const [key, ...rest] = line.split("=");
+      return [key, rest.join("=")];
+    }));
+    const activeState = values.get("ActiveState") ?? "";
+    const pid = values.get("MainPID") ?? "";
     return {
       status: activeState === "active" ? "active" : activeState === "inactive" ? "inactive" : "unknown",
       pid: pid && pid !== "0" ? pid : undefined,
