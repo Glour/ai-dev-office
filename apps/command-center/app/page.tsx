@@ -200,7 +200,7 @@ export default async function CommandCenterPage() {
             </div>
 
             <form className="quick-form" action="/api/tasks" method="post">
-              <textarea name="ownerRequest" rows={4} placeholder="Сформулировать задачу для офиса..." required />
+              <textarea name="ownerRequest" rows={4} placeholder="Сформулировать задачу для офиса..." aria-label="Описание задачи" required />
               <div className="form-grid">
                 <select name="routeType" defaultValue="feature_development" aria-label="Маршрут">
                   {state.routes.length > 0 ? state.routes.map((route) => (
@@ -267,8 +267,8 @@ export default async function CommandCenterPage() {
               <Archive size={18} />
             </div>
             <form className="material-form" action="/api/materials" method="post">
-              <input name="title" placeholder="Название материала" required />
-              <input name="storageUri" placeholder="Ссылка или путь к файлу" required />
+              <input name="title" placeholder="Название материала" aria-label="Название материала" required />
+              <input name="storageUri" placeholder="Ссылка или путь к файлу" aria-label="Ссылка или путь к файлу" required />
               <select name="materialType" defaultValue="instruction" aria-label="Тип материала">
                 <option value="instruction">Инструкция</option>
                 <option value="report">Отчет</option>
@@ -279,7 +279,7 @@ export default async function CommandCenterPage() {
                 <option value="draft">Черновик</option>
                 <option value="verified">Проверено</option>
               </select>
-              <textarea name="sourceSummary" rows={2} placeholder="Коротко: зачем этот материал нужен" />
+              <textarea name="sourceSummary" rows={2} placeholder="Коротко: зачем этот материал нужен" aria-label="Краткое описание материала" />
               <button type="submit"><Plus size={17} /> Добавить</button>
             </form>
             <div className="material-list">
