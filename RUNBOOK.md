@@ -76,10 +76,61 @@ Owner Assistant
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
   ```
 
-- Codex CLI установлен и авторизован.
+- Codex CLI установлен и авторизован, если агенты будут вызывать Codex CLI wrappers.
+- Hermes provider `openai-codex` авторизован отдельно.
 - Git установлен.
 - Доступен `systemd --user`.
 - Docker доступен, если нужен Postgres из `docker-compose.yml`.
+
+## Provider auth: OpenAI Codex
+
+Важно: вход в Codex CLI (`/root/.codex/auth.json`) сам по себе не равен входу Hermes.
+
+Hermes хранит OAuth для provider-а `openai-codex` в своем `auth.json`. Для AI Dev Office provider auth должен быть доступен каждому Hermes-профилю:
+
+```text
+/root/.hermes-ai-dev-office/profiles/*/auth.json
+```
+
+Перед bootstrap или сразу после установки Hermes выполни:
+
+```bash
+hermes auth add openai-codex
+```
+
+Если на сервере уже есть рабочий Hermes auth, bootstrap автоматически попробует взять его из:
+
+```text
+/root/.hermes/auth.json
+```
+
+Если нужно явно импортировать существующий auth-файл:
+
+```bash
+HERMES_PROVIDER_AUTH_SOURCE=/root/.hermes/auth.json scripts/bootstrap-provider-auth.sh
+```
+
+Если нужно импортировать auth Codex CLI:
+
+```bash
+HERMES_PROVIDER_AUTH_SOURCE=/root/.codex/auth.json scripts/bootstrap-provider-auth.sh
+```
+
+Это аварийный/удобный путь. Лучший стабильный вариант — авторизовать Hermes через `hermes auth add openai-codex`, потому что Hermes и Codex CLI могут ротировать refresh token независимо.
+
+Проверить provider auth для всех профилей:
+
+```bash
+scripts/check-provider-auth.sh
+```
+
+Нормальный результат:
+
+```text
+=== owner-assistant ===
+openai-codex: OK
+...
+```
 
 ## Первое развертывание
 
@@ -99,6 +150,8 @@ Bootstrap спросит:
 - topic/thread id для каждого профиля, если используется группа.
 
 Скрипт проверяет каждый токен через Telegram `getMe`. Если токен неверный, bootstrap остановится до запуска сервисов.
+
+Также bootstrap проверяет и раскладывает provider auth `openai-codex` по runtime-профилям. Если provider auth не найден, bootstrap остановится и покажет команду для авторизации.
 
 Токены сохраняются только в runtime-файлах:
 
@@ -172,6 +225,22 @@ done
 - нет `Provider authentication failed`;
 - нет `token was rejected`;
 - нет `Traceback` после старта.
+
+Если видишь:
+
+```text
+Provider authentication failed
+No Codex credentials stored
+```
+
+запусти:
+
+```bash
+scripts/bootstrap-provider-auth.sh
+scripts/check-provider-auth.sh
+scripts/stop-agents.sh
+scripts/start-agents.sh
+```
 
 ## Rollback
 

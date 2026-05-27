@@ -60,6 +60,19 @@ scripts/status-agents.sh
 
 Полный сценарий развертывания описан в [RUNBOOK.md](RUNBOOK.md).
 
+Provider auth для Hermes проверяется отдельно:
+
+```bash
+scripts/check-provider-auth.sh
+```
+
+Если Hermes не видит OpenAI Codex credentials:
+
+```bash
+hermes auth add openai-codex
+scripts/bootstrap-provider-auth.sh
+```
+
 Universal QA:
 
 ```bash

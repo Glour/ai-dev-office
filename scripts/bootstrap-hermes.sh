@@ -78,6 +78,8 @@ for profile in "${profiles[@]}"; do
   systemctl --user enable "$(service_name "$profile")" >/dev/null
 done
 
+"$root/scripts/bootstrap-provider-auth.sh"
+
 echo
 echo "Bootstrap завершен."
 echo "Запусти агентов командой: scripts/start-agents.sh"
