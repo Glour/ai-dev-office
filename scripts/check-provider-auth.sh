@@ -10,12 +10,20 @@ if [ ! -d "$runtime/profiles" ]; then
   exit 1
 fi
 
-require_command python3
+hermes_python="${HERMES_PYTHON:-}"
+if [ -z "$hermes_python" ]; then
+  if [ -x "/usr/local/lib/hermes-agent/venv/bin/python" ]; then
+    hermes_python="/usr/local/lib/hermes-agent/venv/bin/python"
+  else
+    hermes_python="python3"
+  fi
+fi
+require_command "$hermes_python"
 
 failed=0
 for profile in "${profiles[@]}"; do
   printf "=== %s ===\n" "$profile"
-  if HERMES_HOME="$runtime/profiles/$profile" python3 - <<'PY'
+  if HERMES_HOME="$runtime/profiles/$profile" "$hermes_python" - <<'PY'
 from hermes_cli.auth import _read_codex_tokens
 try:
     data = _read_codex_tokens()
