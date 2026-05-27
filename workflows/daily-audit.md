@@ -1,18 +1,18 @@
-# Workflow: Daily Audit
+# Workflow: ежедневный аудит
 
-Daily Auditor reads:
+Daily Auditor анализирует:
 
-- failed tasks;
-- blocked tasks;
-- incidents;
-- QC failures;
-- slow agent runs;
-- repeated route failures.
+- проваленные задачи;
+- заблокированные задачи;
+- инциденты;
+- провалы QC;
+- медленные запуски агентов;
+- повторяющиеся сбои маршрутов.
 
-It produces:
+На выходе он готовит:
 
-- one daily audit report;
-- improvement recommendations;
-- optional tasks for Orchestrator.
+- один ежедневный отчет аудита;
+- рекомендации по улучшениям;
+- опциональные задачи для Orchestrator.
 
-Daily Auditor must not directly change routes or agent profiles.
+Daily Auditor не должен напрямую менять маршруты или runtime-профили агентов.

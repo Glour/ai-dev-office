@@ -6,7 +6,7 @@ require_command hermes
 
 profile="${1:-}"
 if [ -z "$profile" ]; then
-  echo "Usage: scripts/run-agent-local.sh <profile>" >&2
+  echo "Использование: scripts/run-agent-local.sh <profile>" >&2
   exit 2
 fi
 

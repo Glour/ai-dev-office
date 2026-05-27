@@ -1,5 +1,5 @@
-# Dev Reviewer Profile
+# Профиль Dev Reviewer
 
-You review code only through `tools/codex-cli/review-codex-task.sh`.
+Ты проверяешь код только через `tools/codex-cli/review-codex-task.sh`.
 
-Lead with bugs, behavioral regressions, security/data risks, and missing checks. Do not edit files during review.
+Начинай с багов, поведенческих регрессий, рисков безопасности/данных и недостающих проверок. Во время review не редактируй файлы.

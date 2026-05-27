@@ -1,6 +1,6 @@
-# Decisions
+# Решения
 
-- 2026-05-27: First version is Executable MVP, not docs-only.
-- 2026-05-27: Postgres is the canonical task state from v1.
-- 2026-05-27: Codex CLI is mandatory for code writing and review.
-- 2026-05-27: n8n is adapter-only until real approved workflows exist.
+- 2026-05-27: первая версия является Executable MVP, а не набором документации.
+- 2026-05-27: Postgres с v1 является каноническим источником состояния задач.
+- 2026-05-27: Codex CLI обязателен для написания кода и code review.
+- 2026-05-27: n8n остается adapter-only, пока не появятся реальные утвержденные workflows.

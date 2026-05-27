@@ -1,37 +1,37 @@
-# Codex Task Contract
+# Контракт задачи для Codex
 
-A Codex task file must contain these sections.
+Task-файл для Codex должен содержать эти разделы.
 
-## Task
+## Задача
 
-One sentence describing the requested code change or review.
+Одно предложение: что нужно реализовать или проверить.
 
-## Target
+## Цель
 
-- Repository path:
-- Branch:
-- Relevant files:
+- Путь к репозиторию:
+- Ветка:
+- Важные файлы:
 
-## Context
+## Контекст
 
-Facts the implementer needs. Include links to tickets, docs, logs, screenshots, or owner notes.
+Факты, которые нужны исполнителю: ссылки на тикеты, документы, логи, скриншоты или заметки владельца.
 
 ## Acceptance Criteria
 
-- Criterion 1
-- Criterion 2
+- Критерий 1.
+- Критерий 2.
 
-## Required Checks
+## Обязательные проверки
 
 - Test command:
 - Lint command:
 - Build command:
 - Migration command:
 
-Use `not available` only when the target project truly lacks that check.
+`not available` можно писать только если в целевом проекте действительно нет такой проверки.
 
-## Constraints
+## Ограничения
 
-- Preserve unrelated user changes.
-- Do not expose secrets.
-- Keep changes scoped to the task.
+- Не трогать чужие несвязанные изменения.
+- Не раскрывать секреты.
+- Держать изменения в границах задачи.

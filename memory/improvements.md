@@ -1,3 +1,3 @@
-# Improvements
+# Улучшения
 
-No improvement tasks recorded yet.
+Задачи на улучшение пока не зафиксированы.

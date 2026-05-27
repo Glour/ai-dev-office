@@ -1,28 +1,28 @@
-# Materials Library
+# Библиотека материалов
 
-## Mission
+## Миссия
 
-Store verified outputs as reusable, versioned materials linked to tasks, artifacts, QC, and decisions.
+Сохранять проверенные результаты как переиспользуемые материалы с версиями, источниками и связью с QC.
 
-## Responsibilities
+## Ответственность
 
-- Save final reports, briefs, code-review summaries, QA reports, and reusable instructions.
-- Track material status: draft, verified, archived.
-- Maintain version history through the `materials` table.
-- Return only verified materials unless explicitly asked for drafts.
+- Сохранять финальные отчеты, briefs, code-review summaries, QA reports и инструкции.
+- Вести статусы материалов: draft, verified, archived.
+- Хранить версии через таблицу `materials`.
+- По умолчанию возвращать только проверенные материалы.
 
-## Agent
+## Агент
 
 - `materials-librarian`
 
 ## Handoff
 
-Each material must include:
+У каждого материала должны быть:
 
-- title;
-- type;
-- source task;
-- artifact link if present;
-- QC result;
-- version number;
-- storage path or URI.
+- название;
+- тип;
+- исходная задача;
+- ссылка на артефакт, если есть;
+- QC-результат;
+- версия;
+- storage path или URI.

@@ -1,29 +1,29 @@
-# Development Department
+# Отдел разработки
 
-## Mission
+## Миссия
 
-Turn approved engineering tasks into reviewed code changes using Codex CLI as the only write/review instrument.
+Превращать утвержденные инженерные задачи в проверенные изменения кода через Codex CLI.
 
-## Responsibilities
+## Ответственность
 
-- Convert orchestrator briefs into Codex CLI task files.
-- Run implementation through `tools/codex-cli/run-codex-task.sh`.
-- Run review through `tools/codex-cli/review-codex-task.sh`.
-- Return structured artifacts to the task record.
-- Never bypass deterministic checks when a project provides them.
+- Превращать brief от Orchestrator в task-файл для Codex CLI.
+- Запускать реализацию через `tools/codex-cli/run-codex-task.sh`.
+- Запускать ревью через `tools/codex-cli/review-codex-task.sh`.
+- Возвращать структурированные артефакты в задачу.
+- Не пропускать детерминированные проверки, если они есть в проекте.
 
-## Agents
+## Агенты
 
-- `dev-builder`: writes code through Codex CLI.
-- `dev-reviewer`: reviews code through Codex CLI.
+- `dev-builder` — пишет код через Codex CLI.
+- `dev-reviewer` — проверяет код через Codex CLI.
 
 ## Handoff
 
-Output goes to Quality Control with:
+В QC передается:
 
-- task id;
-- target repository/path;
-- Codex run artifact;
-- changed files summary;
-- tests/lint/build output;
-- known risks and open questions.
+- id задачи;
+- целевой репозиторий/путь;
+- артефакт Codex run;
+- список измененных файлов;
+- вывод tests/lint/build;
+- известные риски и открытые вопросы.

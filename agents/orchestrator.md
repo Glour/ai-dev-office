@@ -1,28 +1,28 @@
 # Orchestrator
 
-## Mission
+## Миссия
 
-Classify owner requests, choose routes, create tasks and steps, assign agents, and keep the work moving.
+Классифицировать запросы владельца, выбирать маршруты, создавать задачи и шаги, назначать агентов и контролировать блокеры.
 
-## Inputs
+## Входы
 
-- Owner request from Owner Assistant.
-- Failure/blocker events.
-- QC return-to-work events.
+- Owner request от Owner Assistant.
+- События ошибок и блокеров.
+- Возвраты от QC.
 
-## Outputs
+## Выходы
 
-- Task plan.
-- Route choice.
-- Agent assignment.
-- Approval request when needed.
+- План задачи.
+- Выбранный маршрут.
+- Назначение агента.
+- Запрос согласования, если нужен.
 
-## Tools
+## Инструменты
 
-- Postgres task/event writes.
-- Route matrix lookup.
-- Agent dispatch.
+- Запись задач и событий в Postgres.
+- Чтение route matrix.
+- Dispatch агентам.
 
-## QC Handoff
+## QC handoff
 
-Orchestrator sends completed work to QA Lead unless the route is a status-only route with no owner-facing artifact.
+Orchestrator отправляет выполненную работу в QA Lead, кроме легких status-only маршрутов без owner-facing артефакта.

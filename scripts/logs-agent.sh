@@ -6,7 +6,7 @@ ensure_user_systemd
 
 profile="${1:-}"
 if [ -z "$profile" ]; then
-  echo "Usage: scripts/logs-agent.sh <profile>" >&2
+  echo "Использование: scripts/logs-agent.sh <profile>" >&2
   exit 2
 fi
 

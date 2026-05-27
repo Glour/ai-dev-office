@@ -1,46 +1,48 @@
 # AI Dev Office
 
-Executable MVP for a personal AI development office.
+Executable MVP личного AI-офиса для разработки.
 
-The office is organized as a small company, not as a pile of chats:
+Офис устроен как маленькая управляемая команда, а не как набор разрозненных чатов:
 
 ```text
 Owner Assistant
--> Orchestrator
--> Dev Builder via Codex CLI
--> Tests/Lint
--> Dev Reviewer via Codex CLI
--> QA Lead
--> Materials Librarian
--> Owner Assistant
+→ Orchestrator
+→ Dev Builder через Codex CLI
+→ Tests/Lint
+→ Dev Reviewer через Codex CLI
+→ QA Lead
+→ Materials Librarian
+→ Owner Assistant
 ```
 
-## What This Repo Owns
+## Что хранится в репозитории
 
-- Org-as-code: departments, agents, routes, QC gates, workflows.
-- Runtime templates for Hermes profiles.
-- Postgres schema for tasks, events, approvals, artifacts, QC, materials, incidents, and audits.
-- Codex CLI tool contract. Code writing and code review must go through this contract.
-- Universal QA tool based on Playwright.
-- n8n adapter contract only. Self-hosted n8n is intentionally not part of v1.
+- Оргструктура: отделы, агенты, маршруты, QC-gates, workflows.
+- Шаблоны Hermes-профилей.
+- Postgres-схема для задач, событий, согласований, артефактов, QC, материалов, инцидентов и аудитов.
+- Контракт Codex CLI: писать код и делать ревью кода можно только через wrappers.
+- Universal QA tool на Playwright.
+- n8n adapter contract. Self-hosted n8n в v1 не поднимается.
 
-## What Runtime Owns
+## Что хранится в runtime
 
-Hermes runtime state is not stored in this repo. Deployment copies templates from:
+Состояние Hermes не хранится в git. При развертывании шаблоны из:
 
 ```text
 hermes/profiles/*
 ```
 
-into:
+копируются в:
 
 ```text
 /root/.hermes-ai-dev-office/profiles/*
 ```
 
-Runtime state, secrets, sessions, logs, and caches stay outside git.
+Секреты, токены, сессии, логи, кэши и runtime-state остаются вне репозитория.
 
-## Quick Start
+## Быстрый старт
+
+Postgres:
 
 ```bash
 cp .env.example .env
@@ -48,7 +50,7 @@ docker compose up -d postgres
 docker compose exec postgres psql -U ai_dev_office -d ai_dev_office -c "select count(*) from route_rules;"
 ```
 
-Deploy Hermes profiles on a server:
+Hermes-профили на сервере:
 
 ```bash
 scripts/bootstrap-hermes.sh
@@ -56,9 +58,9 @@ scripts/start-agents.sh
 scripts/status-agents.sh
 ```
 
-See [RUNBOOK.md](RUNBOOK.md) for the full deployment and operations flow.
+Полный сценарий развертывания описан в [RUNBOOK.md](RUNBOOK.md).
 
-Run the QA tool:
+Universal QA:
 
 ```bash
 cd tools/universal-qa
@@ -67,34 +69,34 @@ npm run list-checks
 npm run qa -- ./configs/example-site.json --no-strict
 ```
 
-Run a Codex task wrapper dry smoke:
+Codex CLI dry-run:
 
 ```bash
 tools/codex-cli/run-codex-task.sh --task-file tools/codex-cli/examples/example-task.md --dry-run
 tools/codex-cli/review-codex-task.sh --task-file tools/codex-cli/examples/example-review.md --dry-run
 ```
 
-## Non-Negotiable Development Rule
+## Главное правило разработки
 
-Hermes agents do not edit code directly.
+Hermes-агенты не редактируют код напрямую.
 
-Any code change, bug fix, refactor, migration, architecture review, or implementation review must be delegated to Codex CLI through `tools/codex-cli/`.
+Любое изменение кода, исправление бага, рефакторинг, миграция, архитектурное ревью или ревью реализации выполняется через wrappers в `tools/codex-cli/`.
 
-Hermes agents may:
+Агенты могут:
 
-- classify owner requests;
-- create tasks;
-- choose routes;
-- prepare task briefs;
-- run approved tools;
-- read artifacts and logs;
-- summarize results.
+- классифицировать запрос владельца;
+- создавать задачи;
+- выбирать маршруты;
+- готовить task brief;
+- запускать утвержденные инструменты;
+- читать артефакты и логи;
+- возвращать понятный итог.
 
-Hermes agents must not bypass Codex CLI for code writing or code review.
+Агенты не должны обходить Codex CLI при написании или ревью кода.
 
-## Hermes Profile Runtime
+## Hermes-профили
 
-The office uses one Hermes installation and multiple profile runtimes. In production, each profile should run as its own gateway process via systemd:
+Офис использует одну установку Hermes и несколько профилей. В production каждый профиль запускается отдельным gateway-процессом через systemd:
 
 ```text
 hermes-gateway-ai-dev-office@owner-assistant.service
@@ -103,4 +105,4 @@ hermes-gateway-ai-dev-office@dev-builder.service
 ...
 ```
 
-This lets each agent keep its own Telegram bot, queue, memory, sessions, and logs while still sharing the same office repo and Hermes installation.
+Так у каждого агента есть свой Telegram-бот, очередь, память, сессии и логи, но они используют общий репозиторий офиса и одну установку Hermes.

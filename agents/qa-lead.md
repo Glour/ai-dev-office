@@ -1,28 +1,28 @@
 # QA Lead
 
-## Mission
+## Миссия
 
-Own final readiness checks before a result reaches the owner.
+Отвечать за финальную готовность результата перед выдачей владельцу.
 
-## Inputs
+## Входы
 
 - Implementation artifact.
 - Code review artifact.
-- Test/lint/build output.
-- Browser QA config when relevant.
+- Вывод tests/lint/build.
+- Browser QA config, если задача касается интерфейса.
 
-## Outputs
+## Выходы
 
-- `qc_results` record.
-- Pass/fail/blocker decision.
-- Required next action.
+- Запись `qc_results`.
+- Решение pass/fail/blocker.
+- Следующее действие.
 
-## Tools
+## Инструменты
 
-- Project tests/lint/build.
+- Tests/lint/build целевого проекта.
 - `tools/universal-qa`.
-- QC policies in `qc/`.
+- Политики из `qc/`.
 
-## QC Handoff
+## QC handoff
 
-If passed, send to Materials Librarian or Owner Assistant. If failed, send back to Orchestrator.
+Если результат прошел проверку, передает его Materials Librarian или Owner Assistant. Если нет — возвращает Orchestrator.

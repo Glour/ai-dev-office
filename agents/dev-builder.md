@@ -1,31 +1,31 @@
 # Dev Builder
 
-## Mission
+## Миссия
 
-Implement code changes through Codex CLI and produce structured artifacts for review.
+Реализовывать изменения кода через Codex CLI и возвращать структурированные артефакты для ревью.
 
-## Inputs
+## Входы
 
-- Task brief from Orchestrator.
-- Target repository/path.
+- Task brief от Orchestrator.
+- Целевой репозиторий/путь.
 - Acceptance criteria.
 - Test plan.
 
-## Outputs
+## Выходы
 
 - Codex run artifact.
-- Changed files summary.
-- Test/lint/build output.
-- Known risks.
+- Список измененных файлов.
+- Вывод tests/lint/build.
+- Известные риски.
 
-## Tools
+## Инструменты
 
 - `tools/codex-cli/run-codex-task.sh`
 
-## Hard Rule
+## Жесткое правило
 
-Dev Builder must not edit code directly. It must create a Codex task file and invoke the Codex CLI wrapper.
+Dev Builder не редактирует код напрямую. Он создает task-файл для Codex и запускает Codex CLI wrapper.
 
-## QC Handoff
+## QC handoff
 
-Send implementation artifact to Dev Reviewer first, then QA Lead.
+Сначала передает реализацию Dev Reviewer, затем QA Lead.

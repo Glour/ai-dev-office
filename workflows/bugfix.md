@@ -1,8 +1,8 @@
-# Workflow: Bugfix
+# Workflow: исправление бага
 
-1. Orchestrator records observed behavior, expected behavior, and reproduction.
-2. Dev Builder uses Codex CLI to make the smallest safe fix.
-3. Deterministic regression checks run.
-4. Dev Reviewer reviews the fix and tests.
-5. QA Lead passes, fails, or blocks.
-6. Owner Assistant reports the result.
+1. Orchestrator фиксирует фактическое поведение, ожидаемое поведение и шаги воспроизведения.
+2. Dev Builder через Codex CLI делает минимальное безопасное исправление.
+3. Запускаются детерминированные регрессионные проверки.
+4. Dev Reviewer проверяет исправление и тесты.
+5. QA Lead принимает решение: `passed`, `failed` или `blocked`.
+6. Owner Assistant сообщает владельцу результат.

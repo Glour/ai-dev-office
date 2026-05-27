@@ -9,33 +9,35 @@ repo_path="$(repo_runtime_path)"
 
 require_command hermes
 require_command git
+require_command curl
 ensure_user_systemd
 
-echo "AI Dev Office Hermes bootstrap"
-echo "Repo: $root"
+echo "Bootstrap Hermes для AI Dev Office"
+echo "Репозиторий: $root"
 echo "Runtime home: $home_dir"
 echo
 
-owner_user_id="$(read_default "Owner Telegram user id" "${TELEGRAM_ALLOWED_USERS:-}")"
-default_chat_id="$(read_default "Default Telegram group/chat id, leave empty for DM-only" "${TELEGRAM_HOME_CHANNEL:-}")"
+owner_user_id="$(read_default "Telegram user id владельца" "${TELEGRAM_ALLOWED_USERS:-}")"
+default_chat_id="$(read_default "Telegram group/chat id по умолчанию; оставь пустым для DM-only" "${TELEGRAM_HOME_CHANNEL:-}")"
 
 mkdir -p "$home_dir/profiles"
 
 for profile in "${profiles[@]}"; do
   echo
-  echo "Profile: $profile"
+  echo "Профиль: $profile"
   src="$root/hermes/profiles/$profile"
   dst="$home_dir/profiles/$profile"
   mkdir -p "$dst"
   cp "$src/config.yaml" "$dst/config.yaml"
   cp "$src/AGENTS.md" "$dst/AGENTS.md"
-  token="$(read_secret "Telegram bot token for $profile: ")"
+  token="$(read_secret "Telegram bot token для $profile: ")"
   if [ -z "$token" ]; then
-    echo "Token is required for $profile" >&2
+    echo "Для профиля $profile нужен токен." >&2
     exit 1
   fi
+  validate_telegram_token "$token" "$profile"
   if [ -n "$default_chat_id" ]; then
-    thread_id="$(read_default "Telegram topic/thread id for $profile" "")"
+    thread_id="$(read_default "Telegram topic/thread id для $profile" "")"
     home_channel="$default_chat_id"
   else
     thread_id=""
@@ -77,5 +79,5 @@ for profile in "${profiles[@]}"; do
 done
 
 echo
-echo "Bootstrap complete."
-echo "Start agents with: scripts/start-agents.sh"
+echo "Bootstrap завершен."
+echo "Запусти агентов командой: scripts/start-agents.sh"

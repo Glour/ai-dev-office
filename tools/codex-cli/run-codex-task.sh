@@ -3,11 +3,11 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage:
+Использование:
   run-codex-task.sh --task-file <path> [--artifacts-dir <dir>] [--codex-bin <bin>] [--dry-run]
 
-Creates a structured artifact for an implementation run. In normal mode it invokes
-Codex CLI with the task file content as the prompt.
+Создает структурированный артефакт запуска на реализацию. В обычном режиме вызывает
+Codex CLI и передает содержимое task-файла как prompt.
 USAGE
 }
 
@@ -23,12 +23,12 @@ while [ "$#" -gt 0 ]; do
     --codex-bin) codex_bin="${2:-}"; shift 2 ;;
     --dry-run) dry_run=1; shift ;;
     --help|-h) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
+    *) echo "Неизвестный аргумент: $1" >&2; usage; exit 2 ;;
   esac
 done
 
 if [ -z "$task_file" ] || [ ! -f "$task_file" ]; then
-  echo "Missing --task-file or file does not exist: $task_file" >&2
+  echo "Не указан --task-file или файл не существует: $task_file" >&2
   exit 2
 fi
 
@@ -39,11 +39,11 @@ cp "$task_file" "$run_dir/task.md"
 
 if [ "$dry_run" -eq 1 ]; then
   status="dry-run"
-  printf 'Dry run: would invoke %s with %s\n' "$codex_bin" "$task_file" > "$run_dir/stdout.log"
+  printf 'Dry run: был бы вызван %s с %s\n' "$codex_bin" "$task_file" > "$run_dir/stdout.log"
   : > "$run_dir/stderr.log"
 else
   if ! command -v "$codex_bin" >/dev/null 2>&1; then
-    echo "Codex CLI not found: $codex_bin" > "$run_dir/stderr.log"
+    echo "Codex CLI не найден: $codex_bin" > "$run_dir/stderr.log"
     status="failed"
   else
     set +e

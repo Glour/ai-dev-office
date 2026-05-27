@@ -1,28 +1,45 @@
-# AI Dev Office Runbook
+# AI Dev Office — runbook развертывания
 
-This runbook explains how to deploy the repository as a real Hermes-based AI office.
+Этот документ объясняет, как превратить репозиторий в работающий AI-офис на Hermes.
 
-## Mental Model
+## Как это устроено
 
-There is one Hermes installation/codebase on the server, but multiple Hermes runtime profiles:
+На сервере стоит одна установка Hermes:
 
 ```text
-/usr/local/lib/hermes-agent          # one Hermes installation
-/root/.hermes-ai-dev-office          # one AI Dev Office runtime home
-/root/.hermes-ai-dev-office/profiles # multiple employees/profiles
+/usr/local/lib/hermes-agent
 ```
 
-Each profile is a separate agent identity with its own:
+Для офиса создается один runtime home:
 
-- `config.yaml`
-- `.env`
-- `AGENTS.md`
-- sessions
-- logs
-- state
-- Telegram bot token
+```text
+/root/.hermes-ai-dev-office
+```
 
-For a real office, run one gateway process per profile:
+Внутри него лежат отдельные профили сотрудников:
+
+```text
+/root/.hermes-ai-dev-office/profiles/owner-assistant
+/root/.hermes-ai-dev-office/profiles/orchestrator
+/root/.hermes-ai-dev-office/profiles/dev-builder
+/root/.hermes-ai-dev-office/profiles/dev-reviewer
+/root/.hermes-ai-dev-office/profiles/qa-lead
+/root/.hermes-ai-dev-office/profiles/materials-librarian
+/root/.hermes-ai-dev-office/profiles/daily-auditor
+```
+
+Каждый профиль — отдельный агент со своими:
+
+- `config.yaml`;
+- `.env`;
+- `AGENTS.md`;
+- Telegram-ботом;
+- очередью сообщений;
+- памятью;
+- сессиями;
+- логами.
+
+В рабочем режиме каждый профиль запускается отдельным gateway-процессом:
 
 ```text
 hermes --profile owner-assistant gateway run --replace
@@ -31,31 +48,42 @@ hermes --profile dev-builder gateway run --replace
 ...
 ```
 
-The same Hermes binary is reused, but agents are not just “one shell changing profile”. They are separate long-running gateway processes, so they can receive messages independently and work in parallel if needed.
+То есть это не один агент, который «переключает профиль». Это несколько отдельных процессов, которые используют одну установку Hermes и один репозиторий офиса.
 
-## Recommended v1 Concurrency
+## Рекомендуемый режим v1
 
-Start all profiles as independent gateways, but keep workflow policy mostly sequential:
+Все профили запускаются как отдельные gateway, но маршруты задач остаются в основном последовательными:
 
 ```text
-Owner Assistant -> Orchestrator -> Dev Builder -> Dev Reviewer -> QA Lead -> Materials Librarian
+Owner Assistant
+→ Orchestrator
+→ Dev Builder
+→ Dev Reviewer
+→ QA Lead
+→ Materials Librarian
+→ Owner Assistant
 ```
 
-Use queue mode for each profile so repeated messages do not interrupt an active task.
+У каждого профиля включен queue-mode, поэтому новые сообщения не должны перебивать активную задачу.
 
-Parallelism is allowed later for independent tasks, but v1 should prefer a clear queue over many simultaneous branches.
+Параллельное выполнение можно добавить позже через Postgres task queue и worker-диспетчер. Для первой версии безопаснее держать понятную очередь, чем запускать много веток одновременно.
 
-## Server Prerequisites
+## Требования к серверу
 
-- Hermes installed: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`
-- Codex CLI installed and authenticated.
-- Git installed.
-- systemd user services available.
-- Docker available if you want Postgres from `docker-compose.yml`.
+- Hermes установлен:
 
-## First Deploy
+  ```bash
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+  ```
 
-From the server:
+- Codex CLI установлен и авторизован.
+- Git установлен.
+- Доступен `systemd --user`.
+- Docker доступен, если нужен Postgres из `docker-compose.yml`.
+
+## Первое развертывание
+
+На сервере:
 
 ```bash
 git clone https://github.com/Glour/ai-dev-office.git /root/home/ai-dev-office
@@ -63,28 +91,47 @@ cd /root/home/ai-dev-office
 scripts/bootstrap-hermes.sh
 ```
 
-The bootstrap script will ask for:
+Bootstrap спросит:
 
-- owner Telegram user id;
-- group/chat id if agents live in a Telegram group;
-- per-profile bot token;
-- per-profile topic/thread id.
+- Telegram user id владельца;
+- id группы/чата, если агенты живут в Telegram-группе;
+- Telegram-токен для каждого профиля;
+- topic/thread id для каждого профиля, если используется группа.
 
-Tokens are written only to runtime `.env` files under:
+Скрипт проверяет каждый токен через Telegram `getMe`. Если токен неверный, bootstrap остановится до запуска сервисов.
+
+Токены сохраняются только в runtime-файлах:
 
 ```text
 /root/.hermes-ai-dev-office/profiles/*/.env
 ```
 
-They are not written into git.
+В git токены не попадают.
 
-## Operations
+## Управление агентами
+
+Запустить всех:
 
 ```bash
 scripts/start-agents.sh
-scripts/status-agents.sh
-scripts/logs-agent.sh orchestrator
+```
+
+Остановить всех:
+
+```bash
 scripts/stop-agents.sh
+```
+
+Проверить статус:
+
+```bash
+scripts/status-agents.sh
+```
+
+Посмотреть логи одного агента:
+
+```bash
+scripts/logs-agent.sh orchestrator
 ```
 
 ## Postgres
@@ -95,27 +142,55 @@ docker compose up -d postgres
 docker compose exec postgres psql -U ai_dev_office -d ai_dev_office -c "select route_type from route_rules;"
 ```
 
-## Codex CLI Contract
+Postgres — источник правды по задачам, событиям, артефактам, QC и материалам.
 
-Agents must not edit code directly. Dev Builder and Dev Reviewer use:
+## Codex CLI
+
+Агенты не пишут код напрямую. Для разработки и ревью используются только wrappers:
 
 ```bash
 tools/codex-cli/run-codex-task.sh --task-file path/to/task.md
 tools/codex-cli/review-codex-task.sh --task-file path/to/review.md
 ```
 
+## Проверка Telegram
+
+После запуска проверь:
+
+```bash
+for p in owner-assistant orchestrator dev-builder dev-reviewer qa-lead materials-librarian daily-auditor; do
+  echo "=== $p ==="
+  journalctl --user -u hermes-gateway-ai-dev-office@$p.service --since "10 min ago" --no-pager \
+    | grep -E "Connected to Telegram|Gateway running|Provider authentication|Traceback|ERROR" || true
+done
+```
+
+Нормальное состояние:
+
+- есть `Connected to Telegram`;
+- есть `Gateway running`;
+- нет `Provider authentication failed`;
+- нет `token was rejected`;
+- нет `Traceback` после старта.
+
 ## Rollback
 
-Stop the office:
+Остановить офис:
 
 ```bash
 scripts/stop-agents.sh
 ```
 
-Disable services:
+Отключить сервисы:
 
 ```bash
 systemctl --user disable hermes-gateway-ai-dev-office@{owner-assistant,orchestrator,dev-builder,dev-reviewer,qa-lead,materials-librarian,daily-auditor}.service
 ```
 
-Runtime state stays in `/root/.hermes-ai-dev-office` unless you delete it manually.
+Runtime-данные останутся в:
+
+```text
+/root/.hermes-ai-dev-office
+```
+
+Удалять runtime вручную стоит только если точно нужен полный сброс памяти, сессий и токенов.

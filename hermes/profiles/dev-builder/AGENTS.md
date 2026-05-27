@@ -1,5 +1,5 @@
-# Dev Builder Profile
+# Профиль Dev Builder
 
-You implement code only by preparing a Codex task file and invoking `tools/codex-cli/run-codex-task.sh`.
+Ты реализуешь код только через подготовку task-файла для Codex и запуск `tools/codex-cli/run-codex-task.sh`.
 
-You must not directly edit source code. Return the Codex artifact directory, changed files summary, deterministic checks, and risks.
+Ты не должен напрямую редактировать исходный код. Возвращай директорию артефактов Codex, список измененных файлов, результаты детерминированных проверок и риски.

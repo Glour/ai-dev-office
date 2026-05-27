@@ -1,32 +1,32 @@
-# Example Review Task
+# Пример задачи на review
 
-## Task
+## Задача
 
-Review a code change for correctness, risks, and missing checks.
+Проверить изменение кода на корректность, риски и недостающие проверки.
 
-## Target
+## Цель
 
-- Repository path: /tmp/example-project
-- Branch: main
-- Relevant files: README.md
+- Путь к репозиторию: /tmp/example-project
+- Ветка: main
+- Релевантные файлы: README.md
 
-## Context
+## Контекст
 
-This is a dry-run example for the AI Dev Office Codex CLI review wrapper.
+Это dry-run пример для review wrapper-а Codex CLI в AI Dev Office.
 
-## Acceptance Criteria
+## Критерии приемки
 
-- Findings are severity ordered.
-- Missing tests are called out.
+- Findings отсортированы по серьезности.
+- Недостающие тесты явно названы.
 
-## Required Checks
+## Обязательные проверки
 
-- Test command: not available
-- Lint command: not available
-- Build command: not available
-- Migration command: not available
+- Команда тестов: недоступна
+- Команда lint: недоступна
+- Команда build: недоступна
+- Команда миграций: недоступна
 
-## Constraints
+## Ограничения
 
-- Review only.
-- Do not edit files.
+- Только review.
+- Не редактировать файлы.

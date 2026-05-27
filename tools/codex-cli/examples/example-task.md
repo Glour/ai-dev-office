@@ -1,32 +1,32 @@
-# Example Implementation Task
+# Пример задачи на реализацию
 
-## Task
+## Задача
 
-Create or update the README for a target project.
+Создать или обновить README целевого проекта.
 
-## Target
+## Цель
 
-- Repository path: /tmp/example-project
-- Branch: main
-- Relevant files: README.md
+- Путь к репозиторию: /tmp/example-project
+- Ветка: main
+- Релевантные файлы: README.md
 
-## Context
+## Контекст
 
-This is a dry-run example for the AI Dev Office Codex CLI wrapper.
+Это dry-run пример для wrapper-а Codex CLI в AI Dev Office.
 
-## Acceptance Criteria
+## Критерии приемки
 
-- README explains project purpose.
-- README includes quick start.
+- README объясняет назначение проекта.
+- README содержит быстрый старт.
 
-## Required Checks
+## Обязательные проверки
 
-- Test command: not available
-- Lint command: not available
-- Build command: not available
-- Migration command: not available
+- Команда тестов: недоступна
+- Команда lint: недоступна
+- Команда build: недоступна
+- Команда миграций: недоступна
 
-## Constraints
+## Ограничения
 
-- Keep edits scoped.
-- Do not expose secrets.
+- Держать изменения в рамках задачи.
+- Не раскрывать секреты.

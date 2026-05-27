@@ -40,13 +40,29 @@ require_command() {
   fi
 }
 
+validate_telegram_token() {
+  local token="$1"
+  local label="$2"
+  local response
+  local status
+
+  response="$(mktemp)"
+  status="$(curl -fsS -o "$response" -w "%{http_code}" "https://api.telegram.org/bot${token}/getMe" 2>/dev/null || true)"
+  if [ "$status" != "200" ]; then
+    echo "Telegram отклонил токен для профиля $label. Проверь токен и запусти bootstrap снова." >&2
+    rm -f "$response"
+    return 1
+  fi
+  rm -f "$response"
+}
+
 ensure_user_systemd() {
   if ! command -v systemctl >/dev/null 2>&1; then
-    echo "systemctl is not available on this host." >&2
+    echo "На этом хосте недоступен systemctl." >&2
     exit 1
   fi
   if ! systemctl --user show-environment >/dev/null 2>&1; then
-    echo "systemd user session is not available. Log in as the target user and retry." >&2
+    echo "Недоступна пользовательская systemd-сессия. Зайди под нужным пользователем и повтори запуск." >&2
     exit 1
   fi
 }

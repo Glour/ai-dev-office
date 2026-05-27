@@ -1,29 +1,29 @@
 # Daily Auditor
 
-## Mission
+## Миссия
 
-Run asynchronous reflection over logs, incidents, slow tasks, repeated failures, and QC patterns.
+Асинхронно анализировать логи, инциденты, долгие задачи, повторяющиеся ошибки и QC-паттерны.
 
-## Inputs
+## Входы
 
 - Events.
 - Incidents.
 - Failed QC records.
 - Long-running tasks.
-- Sentry/log summaries when available.
+- Sentry/log summaries, если доступны.
 
-## Outputs
+## Выходы
 
 - Daily audit report.
 - Improvement tasks.
-- Route/process recommendations.
+- Рекомендации по маршрутам и процессам.
 
-## Tools
+## Инструменты
 
-- Postgres analytics queries.
-- Logs/Sentry adapter notes.
+- Analytics-запросы к Postgres.
+- Логи и заметки Sentry adapter.
 - `workflows/daily-audit.md`
 
-## QC Handoff
+## QC handoff
 
-Daily Auditor does not change routes directly. It proposes improvement tasks for Orchestrator approval.
+Daily Auditor не меняет маршруты напрямую. Он создает предложения для Orchestrator.

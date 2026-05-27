@@ -3,10 +3,10 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage:
+Использование:
   review-codex-task.sh --task-file <path> [--artifacts-dir <dir>] [--codex-bin <bin>] [--dry-run]
 
-Creates a structured artifact for a Codex CLI code review run.
+Создает структурированный артефакт запуска code review через Codex CLI.
 USAGE
 }
 
@@ -22,12 +22,12 @@ while [ "$#" -gt 0 ]; do
     --codex-bin) codex_bin="${2:-}"; shift 2 ;;
     --dry-run) dry_run=1; shift ;;
     --help|-h) usage; exit 0 ;;
-    *) echo "Unknown argument: $1" >&2; usage; exit 2 ;;
+    *) echo "Неизвестный аргумент: $1" >&2; usage; exit 2 ;;
   esac
 done
 
 if [ -z "$task_file" ] || [ ! -f "$task_file" ]; then
-  echo "Missing --task-file or file does not exist: $task_file" >&2
+  echo "Не указан --task-file или файл не существует: $task_file" >&2
   exit 2
 fi
 
@@ -38,19 +38,19 @@ cp "$task_file" "$run_dir/task.md"
 
 review_prompt="$(mktemp)"
 {
-  echo "Review the following task/change request. Lead with bugs, risks, regressions, and missing tests. Do not edit files."
+  echo "Проверь следующую задачу/заявку на изменение. Начни с багов, рисков, регрессий и недостающих тестов. Не редактируй файлы."
   echo
   cat "$task_file"
 } > "$review_prompt"
 
 if [ "$dry_run" -eq 1 ]; then
   status="dry-run"
-  printf 'Dry run: would invoke %s review with %s\n' "$codex_bin" "$task_file" > "$run_dir/stdout.log"
+  printf 'Dry run: был бы вызван %s review с %s\n' "$codex_bin" "$task_file" > "$run_dir/stdout.log"
   : > "$run_dir/stderr.log"
   cp "$review_prompt" "$run_dir/review.md"
 else
   if ! command -v "$codex_bin" >/dev/null 2>&1; then
-    echo "Codex CLI not found: $codex_bin" > "$run_dir/stderr.log"
+    echo "Codex CLI не найден: $codex_bin" > "$run_dir/stderr.log"
     status="failed"
   else
     set +e

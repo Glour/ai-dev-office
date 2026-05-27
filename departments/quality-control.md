@@ -1,25 +1,25 @@
-# Quality Control Department
+# Отдел контроля качества
 
-## Mission
+## Миссия
 
-Prevent broken, unverified, risky, or low-quality work from reaching the owner.
+Не допустить, чтобы владелец получил сломанный, непроверенный, рискованный или некачественный результат.
 
-## Responsibilities
+## Ответственность
 
-- Enforce deterministic checks before subjective review.
-- Run or request browser QA through `tools/universal-qa`.
-- Record every QC pass/fail/blocker in `qc_results`.
-- Route failed work back to the correct agent.
-- Feed recurring failures into Daily Audit.
+- Сначала требовать детерминированные проверки, потом субъективное ревью.
+- Запускать browser QA через `tools/universal-qa`, если задача касается интерфейса.
+- Записывать каждый QC-результат в `qc_results`.
+- Возвращать не прошедшую работу правильному агенту.
+- Передавать повторяющиеся ошибки в Daily Audit.
 
-## Agents
+## Агенты
 
-- `qa-lead`: owns release/readiness decisions.
-- `daily-auditor`: analyzes failures, logs, Sentry notes, slow tasks, and repeated defects.
+- `qa-lead` — отвечает за решение «готово / не готово».
+- `daily-auditor` — анализирует ошибки, логи, долгие задачи и повторяющиеся дефекты.
 
 ## Handoff
 
-Only two owner-facing outcomes are allowed:
+Допустимы только два owner-facing исхода:
 
-- `passed`: result can be returned or stored.
-- `blocked`: result cannot be returned; include concrete reasons and next actions.
+- `passed` — результат можно отдавать или сохранять;
+- `blocked` — результат нельзя отдавать, нужна причина и следующий шаг.

@@ -1,10 +1,10 @@
-# Release Checklist
+# Чеклист выпуска
 
-- Task has route type and owner request.
-- Codex implementation artifact exists for code work.
-- Codex review artifact exists for code work.
-- Tests/lint/build are run or explicitly unavailable.
-- Universal QA report exists for browser-facing work.
-- QC result is recorded.
-- Material is saved when the result should be reusable.
-- Owner-facing summary avoids internal logs, tokens, and raw stack traces.
+- У задачи есть route type и owner request.
+- Для code work есть Codex implementation artifact.
+- Для code work есть Codex review artifact.
+- Tests/lint/build запущены или явно недоступны.
+- Для browser-facing задач есть Universal QA report.
+- QC result записан.
+- Материал сохранен, если результат должен переиспользоваться.
+- Owner-facing summary не содержит внутренних логов, токенов и сырых stack traces.

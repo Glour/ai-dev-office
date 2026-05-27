@@ -1,7 +1,7 @@
-# Workflow: Material Lifecycle
+# Workflow: жизненный цикл материалов
 
-1. Materials Librarian receives a passed artifact.
-2. It records the material with version, source task, artifact, and QC link.
-3. Drafts are allowed only when clearly labeled.
-4. Verified materials require a passed QC result.
-5. Archived materials remain searchable but are not returned by default.
+1. Materials Librarian получает артефакт, прошедший QC.
+2. Он сохраняет материал с версией, исходной задачей, артефактом и ссылкой на QC.
+3. Черновики допустимы только с явной пометкой.
+4. Проверенные материалы требуют успешного QC-результата.
+5. Архивные материалы остаются доступными для поиска, но не возвращаются по умолчанию.

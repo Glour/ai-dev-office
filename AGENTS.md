@@ -1,46 +1,46 @@
-# AI Dev Office Agent Rules
+# Правила агентов AI Dev Office
 
-This repository is the source of truth for the personal AI development office.
+Этот репозиторий — источник правды для личного AI-офиса разработки.
 
-## Core Flow
+## Основной поток
 
-Owner Assistant -> Orchestrator -> Dev Builder -> deterministic checks -> Dev Reviewer -> QA Lead -> Materials Librarian -> Owner Assistant.
+Owner Assistant → Orchestrator → Dev Builder → детерминированные проверки → Dev Reviewer → QA Lead → Materials Librarian → Owner Assistant.
 
-## Code Work Policy
+## Правило работы с кодом
 
-All code writing and code review must use the Codex CLI wrappers in `tools/codex-cli/`.
+Любое написание кода и любое ревью кода выполняется только через Codex CLI wrappers в `tools/codex-cli/`.
 
-Agents must not directly edit source code in target projects. They produce task briefs and hand them to Codex CLI. The resulting artifacts are then checked by deterministic tests and QA.
+Агенты не должны напрямую редактировать исходники целевых проектов. Они готовят task brief, передают его в Codex CLI и читают результат из артефактов.
 
-## State Policy
+## Правило состояния
 
-Postgres is the canonical task state. Logs and artifacts may exist on disk, but task truth must be represented in:
+Postgres — источник правды по задачам. Логи и артефакты могут лежать на диске, но рабочая правда должна отражаться в таблицах:
 
-- `tasks`
-- `task_steps`
-- `events`
-- `agent_runs`
-- `artifacts`
-- `qc_results`
-- `materials`
-- `incidents`
-- `daily_audits`
+- `tasks`;
+- `task_steps`;
+- `events`;
+- `agent_runs`;
+- `artifacts`;
+- `qc_results`;
+- `materials`;
+- `incidents`;
+- `daily_audits`.
 
-## Routing Policy
+## Правило маршрутизации
 
-Routes are defined in `routes/`. Every workflow must identify:
+Маршруты описаны в `routes/`. Каждый workflow должен фиксировать:
 
-- route type;
-- owner-facing outcome;
-- assigned department;
-- primary agent;
-- required tools;
-- QC gate;
-- approval policy;
-- storage target.
+- тип маршрута;
+- ценный результат для владельца;
+- ответственный отдел;
+- основного агента;
+- нужные инструменты;
+- QC-gate;
+- политику согласований;
+- место сохранения результата.
 
-## QA Policy
+## Правило QC
 
-No owner-facing result is final until QC either passes it or records why the result is blocked.
+Ни один результат не считается финальным, пока QC не подтвердит его или не зафиксирует понятный блокер.
 
-For code work, QA must include deterministic checks first: tests, lint, typecheck, build, migration validation, or a documented reason why a check is not available.
+Для задач с кодом сначала идут детерминированные проверки: tests, lint, typecheck, build, проверка миграций или явная причина, почему такой проверки нет.

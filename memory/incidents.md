@@ -1,3 +1,3 @@
-# Incidents
+# Инциденты
 
-No incidents recorded yet.
+Инциденты пока не зафиксированы.

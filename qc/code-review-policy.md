@@ -1,20 +1,20 @@
-# Code Review Policy
+# Политика ревью кода
 
-Code review is performed through Codex CLI, not by direct manual edits from Hermes agents.
+Ревью кода выполняется через Codex CLI, а не прямыми ручными правками Hermes-агентов.
 
-Review findings must lead with:
+Findings должны идти в таком порядке:
 
-1. correctness bugs;
-2. security or data-loss risks;
-3. broken acceptance criteria;
-4. missing deterministic tests;
-5. maintainability issues.
+1. ошибки корректности;
+2. security или data-loss риски;
+3. сломанные acceptance criteria;
+4. недостающие детерминированные проверки;
+5. проблемы поддерживаемости.
 
-The reviewer returns one of:
+Ревьюер возвращает одно из решений:
 
-- `pass`
-- `pass-with-notes`
-- `changes-required`
-- `blocked`
+- `pass`;
+- `pass-with-notes`;
+- `changes-required`;
+- `blocked`.
 
-Any `changes-required` result routes back to Orchestrator as `bugfix`.
+Любой результат `changes-required` возвращается Orchestrator как маршрут `bugfix`.
