@@ -461,9 +461,7 @@ a {
 
 .agent-row .pill {
   flex: 0 0 auto;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .control-form {
