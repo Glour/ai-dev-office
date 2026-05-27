@@ -34,5 +34,6 @@ WantedBy=default.target
 SERVICE
 
 systemctl --user daemon-reload
-systemctl --user enable --now "$service"
+systemctl --user enable "$service" >/dev/null
+systemctl --user restart "$service"
 systemctl --user --no-pager status "$service"
