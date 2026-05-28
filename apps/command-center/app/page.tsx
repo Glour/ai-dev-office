@@ -185,6 +185,25 @@ function Header({
           {message}
         </Badge>
       </div>
+      <nav className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden" aria-label="Разделы центра управления">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Button
+              asChild
+              className="h-8 shrink-0 gap-1.5 px-2"
+              key={item.view}
+              size="sm"
+              variant={activeView === item.view ? "secondary" : "ghost"}
+            >
+              <a href={viewHref(item.view)}>
+                <Icon className="size-3.5" />
+                {item.label}
+              </a>
+            </Button>
+          );
+        })}
+      </nav>
     </header>
   );
 }
