@@ -374,6 +374,12 @@ function contentTypeForArtifact(filePath: string) {
   return "application/octet-stream";
 }
 
+function artifactSortWeight(artifact: ArtifactState) {
+  if (artifact.contentType?.startsWith("image/")) return 0;
+  if (artifact.contentType === "text/markdown") return 1;
+  return 2;
+}
+
 function extractArtifactPaths(...values: Array<string | null | undefined>) {
   const paths = new Set<string>();
   for (const value of values) {
@@ -441,10 +447,14 @@ async function discoverRuntimeArtifacts(input: {
 
   const artifacts: ArtifactState[] = [];
   for (const candidate of candidates) {
-    artifacts.push(...await walkArtifactPath(candidate, input.taskId, 80 - artifacts.length));
-    if (artifacts.length >= 80) break;
+    artifacts.push(...await walkArtifactPath(candidate, input.taskId, 200 - artifacts.length));
+    if (artifacts.length >= 200) break;
   }
-  return artifacts;
+  const deduped = new Map<string, ArtifactState>();
+  for (const artifact of artifacts) deduped.set(artifact.uri, artifact);
+  return Array.from(deduped.values())
+    .sort((a, b) => artifactSortWeight(a) - artifactSortWeight(b) || a.title.localeCompare(b.title))
+    .slice(0, 80);
 }
 
 async function readHermesKanbanSnapshots(hermesIds: string[]): Promise<Record<string, HermesKanbanSnapshot>> {
