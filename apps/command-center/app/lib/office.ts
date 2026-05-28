@@ -25,6 +25,8 @@ const agentDirectory = [
 
 let pool: Pool | null = null;
 
+const repoPath = process.env.AI_DEV_OFFICE_REPO ?? process.cwd().replace(/\/apps\/command-center$/, "");
+
 type RouteStep = {
   title: string;
   assignedAgent: string;
@@ -73,6 +75,72 @@ function stepsForRoute(routeType: string, primaryAgent: string): RouteStep[] {
     { title: "Контроль результата", assignedAgent: "qa-lead" },
     { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
   ];
+}
+
+async function createHermesKanbanTask(input: {
+  taskId: string;
+  title: string;
+  body: string;
+  assignee: string;
+  routeType: string;
+  priority: string;
+  steps: RouteStep[];
+}) {
+  const hermesHome = process.env.HERMES_RUNTIME_HOME ?? `${process.env.HOME ?? "/root"}/.hermes-ai-dev-office`;
+  const priorityMap: Record<string, string> = {
+    low: "-10",
+    normal: "0",
+    high: "10",
+    urgent: "20",
+  };
+  const body = [
+    input.body,
+    "",
+    `Command Center task id: ${input.taskId}`,
+    `Route: ${input.routeType}`,
+    "Steps:",
+    ...input.steps.map((step, index) => `${index + 1}. ${step.title} -> ${step.assignedAgent}${step.toolName ? ` (${step.toolName})` : ""}`),
+  ].join("\n");
+
+  const createArgs = [
+    "kanban",
+    "create",
+    input.title,
+    "--body",
+    body,
+    "--assignee",
+    input.assignee,
+    "--workspace",
+    `dir:${repoPath}`,
+    "--priority",
+    priorityMap[input.priority] ?? "0",
+    "--idempotency-key",
+    `command-center:${input.taskId}`,
+    "--created-by",
+    "command-center",
+    "--json",
+  ];
+
+  const env = {
+    ...process.env,
+    HERMES_HOME: hermesHome,
+    AI_DEV_OFFICE_REPO: repoPath,
+  };
+
+  const { stdout } = await execFileAsync("hermes", createArgs, { env, timeout: 15000, maxBuffer: 1024 * 1024 });
+  const created = JSON.parse(stdout) as { id?: string };
+  if (!created.id) throw new Error("Hermes Kanban did not return a task id");
+
+  const dispatch = await execFileAsync("hermes", ["kanban", "dispatch", "--max", "1", "--json"], {
+    env,
+    timeout: 15000,
+    maxBuffer: 1024 * 1024,
+  });
+
+  return {
+    hermesTaskId: created.id,
+    dispatch: dispatch.stdout ? JSON.parse(dispatch.stdout) as unknown : null,
+  };
 }
 
 function databaseUrl() {
@@ -407,6 +475,36 @@ export async function createTask(input: {
     `, [taskId, route.route_type, firstStep?.assignedAgent ?? route.primary_agent, steps.length, firstStep?.title ?? "Запуск"]);
 
     await client.query("COMMIT");
+
+    try {
+      const hermes = await createHermesKanbanTask({
+        taskId,
+        title: input.ownerRequest.split("\n")[0]?.slice(0, 96) || `Command Center task ${taskId}`,
+        body: input.ownerRequest,
+        assignee: firstStep?.assignedAgent ?? route.primary_agent,
+        routeType: route.route_type,
+        priority: input.priority,
+        steps,
+      });
+
+      await queryRows(`
+        UPDATE tasks
+        SET metadata = metadata || jsonb_build_object('hermes_kanban_task_id', $2::text, 'hermes_dispatch_at', now())
+        WHERE id = $1::uuid
+      `, [taskId, hermes.hermesTaskId]);
+
+      await queryRows(`
+        INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+        VALUES ($1::uuid, 'hermes.kanban.dispatched', 'command-center', 'info', 'Задача создана в Hermes Kanban и передана dispatcher', jsonb_build_object('hermes_task_id', $2::text, 'dispatch', $3::jsonb))
+      `, [taskId, hermes.hermesTaskId, JSON.stringify(hermes.dispatch ?? {})]);
+    } catch (dispatchError) {
+      const message = dispatchError instanceof Error ? dispatchError.message : "Hermes Kanban dispatch failed";
+      await queryRows(`
+        INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+        VALUES ($1::uuid, 'hermes.kanban.dispatch_failed', 'command-center', 'warn', 'Не удалось передать задачу в Hermes Kanban', jsonb_build_object('error', $2::text))
+      `, [taskId, message]);
+    }
+
     return { id: taskId };
   } catch (error) {
     await client.query("ROLLBACK");
