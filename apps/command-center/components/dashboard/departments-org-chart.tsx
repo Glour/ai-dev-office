@@ -232,7 +232,7 @@ function OfficeNode({
 }) {
   return (
     <button
-      className={`min-h-28 rounded-xl border p-4 text-left transition hover:border-foreground/25 hover:bg-muted/40 ${active ? "border-foreground bg-foreground text-background" : "bg-background"}`}
+      className={`min-h-28 rounded-xl border p-4 text-left transition ${active ? "border-foreground bg-foreground text-background hover:bg-foreground hover:text-background" : "bg-background hover:border-foreground/25 hover:bg-muted/40"}`}
       onClick={onClick}
       type="button"
     >
@@ -267,7 +267,7 @@ function DepartmentNode({
 }) {
   return (
     <button
-      className={`min-h-40 rounded-xl border bg-background p-4 text-left transition hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-sm ${active ? "border-foreground shadow-sm" : ""} ${className}`}
+      className={`min-h-40 rounded-xl border bg-background p-4 text-left transition hover:-translate-y-0.5 hover:border-foreground/25 hover:bg-muted/20 hover:shadow-sm ${active ? "border-foreground shadow-sm hover:bg-background" : ""} ${className}`}
       onClick={onClick}
       type="button"
     >

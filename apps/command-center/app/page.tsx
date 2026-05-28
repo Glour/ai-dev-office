@@ -12,8 +12,10 @@ import {
   PlusIcon,
   RouteIcon,
   ShieldCheckIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { DepartmentsOrgChart } from "@/components/dashboard/departments-org-chart";
+import { FileDropzone } from "@/components/dashboard/file-dropzone";
 import { LiveTaskTable } from "@/components/dashboard/live-task-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,11 +40,11 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { loadCommandCenterState } from "./lib/office";
-import type { AgentState, EventState, MaterialState, RouteRuleState } from "./lib/types";
+import type { AgentState, CapabilityState, EventState, MaterialState, RouteRuleState } from "./lib/types";
 
 export const dynamic = "force-dynamic";
 
-type View = "overview" | "tasks" | "departments" | "agents" | "materials" | "routes" | "events";
+type View = "overview" | "tasks" | "departments" | "agents" | "materials" | "capabilities" | "routes" | "events";
 
 const basePath = process.env.NEXT_PUBLIC_COMMAND_CENTER_BASE_PATH ?? process.env.COMMAND_CENTER_BASE_PATH ?? "";
 
@@ -52,6 +54,7 @@ const navItems: Array<{ view: View; label: string; description: string; icon: ty
   { view: "departments", label: "Отделы", description: "Оргструктура и ответственность", icon: NetworkIcon },
   { view: "agents", label: "Агенты", description: "Runtime gateway", icon: BotIcon },
   { view: "materials", label: "Материалы", description: "База знаний", icon: LibraryIcon },
+  { view: "capabilities", label: "Навыки", description: "Skills и tools", icon: WrenchIcon },
   { view: "routes", label: "Маршруты", description: "Процессы", icon: RouteIcon },
   { view: "events", label: "Журнал", description: "События", icon: DatabaseIcon },
 ];
@@ -72,6 +75,7 @@ const statusLabels: Record<string, string> = {
   archived: "архив",
   active: "активен",
   inactive: "выключен",
+  disabled: "выключен",
   unknown: "неизвестно",
   low: "низкий",
   normal: "обычный",
@@ -297,25 +301,22 @@ function AgentSummary({ agents }: { agents: AgentState[] }) {
 
 function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentState[] }) {
   const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  const intakeRoute = routes.find((route) => route.routeType === "owner_request");
+  const ownerAgent = agents.find((agent) => agent.id === "owner-assistant");
   return (
-    <form action={`${basePath}/api/tasks`} className="grid gap-3" method="post">
+    <form action={`${basePath}/api/tasks`} className="grid gap-3" encType="multipart/form-data" method="post">
       <Textarea aria-label="Описание задачи" name="ownerRequest" placeholder="Сформулировать задачу для офиса..." required rows={5} />
-      <div className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_0.8fr_auto]">
-        <select aria-label="Маршрут" className={selectClass} defaultValue="feature_development" name="routeType">
-          {routes.length > 0 ? routes.map((route) => <option value={route.routeType} key={route.routeType}>{route.name}</option>) : null}
-          {routes.length === 0 ? <option value="feature_development">Feature development</option> : null}
-        </select>
-        <select aria-label="Отдел" className={selectClass} defaultValue="development" name="assignedDepartment">
-          <option value="management">Management</option>
-          <option value="development">Development</option>
-          <option value="quality-control">Quality Control</option>
-          <option value="marketing">Marketing</option>
-          <option value="security">Security</option>
-          <option value="materials-library">Materials Library</option>
-        </select>
-        <select aria-label="Агент" className={selectClass} defaultValue="dev-builder" name="assignedAgent">
-          {agents.map((agent) => <option value={agent.id} key={agent.id}>{agent.name}</option>)}
-        </select>
+      <FileDropzone description="Файлы попадут в задачу как артефакты, а главный ассистент увидит их вместе с текстом." />
+      <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+        <input type="hidden" name="routeType" value="owner_request" />
+        <input type="hidden" name="assignedDepartment" value="management" />
+        <input type="hidden" name="assignedAgent" value="owner-assistant" />
+        <div className="flex min-h-8 flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 text-sm text-muted-foreground">
+          <span>Вход: {intakeRoute?.name ?? "Owner request intake"}</span>
+          <span>→</span>
+          <span>{ownerAgent?.name ?? "Owner Assistant"}</span>
+          <span>→ автоматическая маршрутизация</span>
+        </div>
         <select aria-label="Приоритет" className={selectClass} defaultValue="normal" name="priority">
           <option value="low">Низкий</option>
           <option value="normal">Обычный</option>
@@ -332,10 +333,10 @@ function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentS
 function MaterialForm() {
   const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
   return (
-    <form action={`${basePath}/api/materials`} className="grid gap-3" method="post">
+    <form action={`${basePath}/api/materials`} className="grid gap-3" encType="multipart/form-data" method="post">
       <div className="grid gap-2 md:grid-cols-2">
-        <Input aria-label="Название материала" name="title" placeholder="Название материала" required />
-        <Input aria-label="Ссылка или путь к файлу" name="storageUri" placeholder="Ссылка или путь к файлу" required />
+        <Input aria-label="Название материала" name="title" placeholder="Название материала или папки" />
+        <Input aria-label="Ссылка или путь к файлу" name="storageUri" placeholder="Ссылка, если материал уже где-то лежит" />
         <select aria-label="Тип материала" className={selectClass} defaultValue="instruction" name="materialType">
           <option value="instruction">Инструкция</option>
           <option value="report">Отчет</option>
@@ -347,6 +348,7 @@ function MaterialForm() {
           <option value="verified">Проверено</option>
         </select>
       </div>
+      <FileDropzone description="Можно загрузить один или несколько файлов; каждый станет отдельным материалом библиотеки." />
       <Textarea aria-label="Краткое описание материала" name="sourceSummary" placeholder="Коротко: зачем этот материал нужен" rows={3} />
       <Button className="w-full md:w-fit" type="submit"><PlusIcon className="size-4" />Добавить</Button>
     </form>
@@ -378,6 +380,98 @@ function AgentTable({ agents }: { agents: AgentState[] }) {
   );
 }
 
+function CapabilityManager({ agents, capabilities }: { agents: AgentState[]; capabilities: CapabilityState[] }) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Добавить навык или инструмент</CardTitle>
+          <CardDescription>Задайте зону видимости: весь офис, отдел или конкретный агент.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CapabilityForm agents={agents} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Каталог навыков и инструментов</CardTitle>
+          <CardDescription>Редактируемый список того, чем могут пользоваться отделы и агенты.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {capabilities.map((capability) => (
+            <details className="rounded-xl border bg-background p-4" key={capability.id}>
+              <summary className="cursor-pointer list-none">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                    {capability.type === "tool" ? <WrenchIcon className="size-4" /> : <span className="text-sm font-semibold">S</span>}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{capability.name}</p>
+                      <Badge variant="outline">{capability.type === "tool" ? "инструмент" : "скилл"}</Badge>
+                      <Badge className={toneClass(capability.status)} variant="outline">{label(capability.status)}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{capability.description || "Описание не задано"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {capability.scopeAgent ? `агент: ${capability.scopeAgent}` : capability.scopeDepartment ? `отдел: ${capability.scopeDepartment}` : "весь офис"}
+                    </p>
+                  </div>
+                </div>
+              </summary>
+              <div className="mt-4 border-t pt-4">
+                <CapabilityForm agents={agents} capability={capability} />
+              </div>
+            </details>
+          ))}
+          {capabilities.length === 0 ? <p className="text-sm text-muted-foreground">Навыки и инструменты пока не заведены.</p> : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function CapabilityForm({ agents, capability }: { agents: AgentState[]; capability?: CapabilityState }) {
+  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  const departments = Array.from(new Set(agents.map((agent) => agent.department))).sort();
+  return (
+    <form action={`${basePath}/api/capabilities`} className="grid gap-3" method="post">
+      <input name="id" type="hidden" value={capability?.id ?? ""} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <select aria-label="Тип" className={selectClass} defaultValue={capability?.type ?? "skill"} name="capabilityType">
+          <option value="skill">Скилл</option>
+          <option value="tool">Инструмент</option>
+        </select>
+        <select aria-label="Статус" className={selectClass} defaultValue={capability?.status ?? "active"} name="status">
+          <option value="active">Активен</option>
+          <option value="draft">Черновик</option>
+          <option value="disabled">Выключен</option>
+        </select>
+      </div>
+      <Input aria-label="Название" defaultValue={capability?.name ?? ""} name="name" placeholder="Название" required />
+      <Input aria-label="Slug" defaultValue={capability?.slug ?? ""} name="slug" placeholder="slug-название" required />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <select aria-label="Отдел" className={selectClass} defaultValue={capability?.scopeDepartment ?? ""} name="scopeDepartment">
+          <option value="">Весь офис</option>
+          {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+        </select>
+        <select aria-label="Агент" className={selectClass} defaultValue={capability?.scopeAgent ?? ""} name="scopeAgent">
+          <option value="">Не ограничивать агентом</option>
+          {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+        </select>
+      </div>
+      <Textarea aria-label="Описание" defaultValue={capability?.description ?? ""} name="description" placeholder="Что это дает офису" rows={3} />
+      <Textarea aria-label="Инструкции" defaultValue={capability?.instructions ?? ""} name="instructions" placeholder="Инструкции, правила использования, промпт или policy" rows={6} />
+      <Textarea aria-label="Конфиг JSON" className="font-mono text-xs" defaultValue={capability?.config ?? "{}"} name="config" placeholder='{"visibility":"department"}' rows={4} />
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit"><PlusIcon className="size-4" />{capability ? "Сохранить" : "Добавить"}</Button>
+        {capability ? (
+          <Button name="action" type="submit" value="delete" variant="destructive">Удалить</Button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
 
 function MaterialTable({ materials }: { materials: MaterialState[] }) {
   return (
@@ -557,6 +651,10 @@ export default async function CommandCenterPage({
                 <CardContent><MaterialTable materials={state.materials} /></CardContent>
               </Card>
             </>
+          ) : null}
+
+          {activeView === "capabilities" ? (
+            <CapabilityManager agents={state.agents} capabilities={state.capabilities} />
           ) : null}
 
           {activeView === "routes" ? (

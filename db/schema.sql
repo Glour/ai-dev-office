@@ -124,6 +124,21 @@ CREATE TABLE IF NOT EXISTS materials (
   UNIQUE (title, version)
 );
 
+CREATE TABLE IF NOT EXISTS office_capabilities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  capability_type TEXT NOT NULL CHECK (capability_type IN ('skill', 'tool')),
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'draft', 'disabled', 'archived')),
+  scope_department TEXT,
+  scope_agent TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT '',
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS incidents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
@@ -156,4 +171,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_task_agent ON agent_runs (task_id, age
 CREATE INDEX IF NOT EXISTS idx_artifacts_task_type ON artifacts (task_id, artifact_type);
 CREATE INDEX IF NOT EXISTS idx_qc_results_task_created ON qc_results (task_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_materials_status_type ON materials (status, material_type);
+CREATE INDEX IF NOT EXISTS idx_office_capabilities_type_status ON office_capabilities (capability_type, status);
+CREATE INDEX IF NOT EXISTS idx_office_capabilities_scope ON office_capabilities (scope_department, scope_agent);
 CREATE INDEX IF NOT EXISTS idx_incidents_status_severity ON incidents (status, severity, created_at DESC);

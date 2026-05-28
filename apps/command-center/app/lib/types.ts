@@ -90,6 +90,20 @@ export type RouteRuleState = {
   approvalRequired: boolean;
 };
 
+export type CapabilityState = {
+  id: string;
+  type: "skill" | "tool";
+  name: string;
+  slug: string;
+  status: string;
+  scopeDepartment?: string;
+  scopeAgent?: string;
+  description: string;
+  instructions: string;
+  config: string;
+  updatedAt: string;
+};
+
 export type DepartmentState = {
   id: string;
   name: string;
@@ -122,4 +136,5 @@ export type CommandCenterState = {
   materials: MaterialState[];
   events: EventState[];
   routes: RouteRuleState[];
+  capabilities: CapabilityState[];
 };

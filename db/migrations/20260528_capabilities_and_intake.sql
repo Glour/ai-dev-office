@@ -1,19 +1,25 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS office_capabilities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  capability_type TEXT NOT NULL CHECK (capability_type IN ('skill', 'tool')),
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'draft', 'disabled', 'archived')),
+  scope_department TEXT,
+  scope_agent TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  instructions TEXT NOT NULL DEFAULT '',
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_office_capabilities_type_status ON office_capabilities (capability_type, status);
+CREATE INDEX IF NOT EXISTS idx_office_capabilities_scope ON office_capabilities (scope_department, scope_agent);
+
 INSERT INTO route_rules (route_type, name, department, primary_agent, qc_required, approval_required, definition)
-VALUES
-  ('owner_request', 'Owner request intake', 'management', 'owner-assistant', true, false, '{"workflow":"workflows/owner-request.md","next":["orchestrator"],"routing":"auto"}'),
-  ('feature_development', 'Feature development', 'development', 'dev-builder', true, false, '{"workflow":"workflows/feature-development.md","next":["dev-reviewer","qa-lead","materials-librarian"]}'),
-  ('bugfix', 'Bug fix', 'development', 'dev-builder', true, false, '{"workflow":"workflows/bugfix.md","next":["dev-reviewer","qa-lead"]}'),
-  ('qa_review', 'QA review', 'quality-control', 'qa-lead', true, false, '{"workflow":"workflows/qa-review.md","tools":["universal-qa"]}'),
-  ('material_save', 'Material save', 'materials-library', 'materials-librarian', false, false, '{"workflow":"workflows/material-lifecycle.md"}'),
-  ('daily_audit', 'Daily audit', 'quality-control', 'daily-auditor', false, false, '{"workflow":"workflows/daily-audit.md"}'),
-  ('content_production', 'Content production', 'marketing', 'seo-strategist', true, true, '{"workflow":"workflows/content-production.md","next":["marketing-researcher","content-writer","seo-strategist","qa-lead","materials-librarian"]}'),
-  ('seo_brief', 'SEO brief', 'marketing', 'seo-strategist', false, false, '{"workflow":"workflows/content-production.md"}'),
-  ('marketing_research', 'Marketing research', 'marketing', 'marketing-researcher', true, false, '{"workflow":"workflows/content-production.md"}'),
-  ('content_rewrite', 'Content rewrite', 'marketing', 'content-writer', true, false, '{"workflow":"workflows/content-production.md","next":["seo-strategist","qa-lead"]}'),
-  ('seo_review', 'SEO review', 'marketing', 'seo-strategist', false, false, '{"workflow":"workflows/content-production.md"}'),
-  ('ad_campaign', 'Ad campaign', 'marketing', 'ads-specialist', true, true, '{"workflow":"workflows/ad-campaign.md","tools":["yandex-metrica","yandex-direct","yandex-webmaster"],"next":["security-officer","qa-lead"]}'),
-  ('security_review', 'Security review', 'security', 'security-officer', true, false, '{"workflow":"workflows/security-review.md"}'),
-  ('release_security_gate', 'Release security gate', 'security', 'security-officer', true, true, '{"workflow":"workflows/security-review.md","next":["qa-lead"]}')
+VALUES ('owner_request', 'Owner request intake', 'management', 'owner-assistant', true, false, '{"workflow":"workflows/owner-request.md","next":["orchestrator"],"routing":"auto"}')
 ON CONFLICT (route_type) DO UPDATE
 SET name = EXCLUDED.name,
     department = EXCLUDED.department,
@@ -41,16 +47,4 @@ SET capability_type = EXCLUDED.capability_type,
     config = EXCLUDED.config,
     updated_at = now();
 
-INSERT INTO tasks (owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level, acceptance_criteria, metadata)
-VALUES (
-  'Seed task: verify AI Dev Office executable MVP scaffolding.',
-  'planned',
-  'qa_review',
-  'quality-control',
-  'qa-lead',
-  'normal',
-  'low',
-  '["Postgres schema loads", "Route rules exist", "Codex CLI wrappers support dry-run", "Universal QA lists checks"]',
-  '{"seed":true}'
-)
-ON CONFLICT DO NOTHING;
+COMMIT;

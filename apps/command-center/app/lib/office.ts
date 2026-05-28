@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { Pool } from "pg";
 import type {
   AgentState,
+  CapabilityState,
   CommandCenterState,
   EventState,
   DepartmentState,
@@ -40,7 +41,7 @@ const departmentDirectory: DepartmentState[] = [
     flows: ["owner_request", "route_selection", "handoff", "final_report"],
     products: ["план задачи", "статус", "финальный отчет"],
     agentIds: ["owner-assistant", "orchestrator"],
-    routeTypes: ["feature_development", "bugfix", "content_production", "ad_campaign", "security_review"],
+    routeTypes: ["owner_request", "feature_development", "bugfix", "content_production", "ad_campaign", "security_review"],
   },
   {
     id: "development",
@@ -115,6 +116,13 @@ type RouteStep = {
 };
 
 const routeFlows: Record<string, RouteStep[]> = {
+  owner_request: [
+    { title: "Прием задачи владельца", assignedAgent: "owner-assistant" },
+    { title: "Классификация и выбор маршрута", assignedAgent: "orchestrator" },
+    { title: "Постановка задачи ответственному отделу", assignedAgent: "orchestrator" },
+    { title: "Контроль результата", assignedAgent: "qa-lead" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
   feature_development: [
     { title: "Классификация запроса и постановка маршрута", assignedAgent: "orchestrator" },
     { title: "Реализация через Codex CLI", assignedAgent: "dev-builder", toolName: "tools/codex-cli/run-codex-task.sh" },
@@ -573,7 +581,7 @@ async function loadDatabaseState() {
     // The dashboard must stay available even if Hermes runtime is temporarily unavailable.
   }
 
-  const [tasks, taskSteps, taskArtifacts, taskQcResults, materials, events, routes, failedQc] = await Promise.all([
+  const [tasks, taskSteps, taskArtifacts, taskQcResults, materials, events, routes, capabilities, failedQc] = await Promise.all([
     queryRows<{
       id: string;
       owner_request: string;
@@ -686,6 +694,25 @@ async function loadDatabaseState() {
       FROM route_rules
       ORDER BY route_type
     `),
+    queryRows<{
+      id: string;
+      capability_type: "skill" | "tool";
+      name: string;
+      slug: string;
+      status: string;
+      scope_department: string | null;
+      scope_agent: string | null;
+      description: string;
+      instructions: string;
+      config: string;
+      updated_at: string;
+    }>(`
+      SELECT id::text, capability_type, name, slug, status, scope_department, scope_agent,
+             description, instructions, config::text, updated_at::text
+      FROM office_capabilities
+      WHERE status <> 'archived'
+      ORDER BY capability_type, name
+    `),
     queryRows<{ count: string }>("SELECT count(*)::text FROM qc_results WHERE status = 'failed'"),
   ]);
 
@@ -774,6 +801,19 @@ async function loadDatabaseState() {
       qcRequired: route.qc_required,
       approvalRequired: route.approval_required,
     })),
+    capabilities: capabilities.map<CapabilityState>((capability) => ({
+      id: capability.id,
+      type: capability.capability_type,
+      name: capability.name,
+      slug: capability.slug,
+      status: capability.status,
+      scopeDepartment: capability.scope_department ?? undefined,
+      scopeAgent: capability.scope_agent ?? undefined,
+      description: capability.description,
+      instructions: capability.instructions,
+      config: capability.config,
+      updatedAt: capability.updated_at,
+    })),
     failedQc: Number(failedQc[0]?.count ?? 0),
   };
 }
@@ -804,6 +844,7 @@ function fallbackState(agents: AgentState[], message: string): CommandCenterStat
       createdAt: now,
     }],
     routes: [],
+    capabilities: [],
   };
 }
 
@@ -1084,5 +1125,114 @@ export async function createMaterial(input: {
     VALUES ('material.created', 'command-center', 'info', 'Материал добавлен в библиотеку', jsonb_build_object('material_id', $1::text))
   `, [rows[0]?.id]);
 
+  return rows[0];
+}
+
+export async function createArtifact(input: {
+  taskId?: string;
+  materialId?: string;
+  artifactType: string;
+  title: string;
+  uri: string;
+  checksum?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const rows = await queryRows<{ id: string }>(`
+    INSERT INTO artifacts (task_id, artifact_type, title, uri, checksum, metadata)
+    VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)
+    RETURNING id::text
+  `, [
+    input.taskId ?? null,
+    input.artifactType,
+    input.title,
+    input.uri,
+    input.checksum ?? null,
+    JSON.stringify({ ...(input.metadata ?? {}), material_id: input.materialId }),
+  ]);
+
+  if (input.materialId && rows[0]?.id) {
+    await queryRows(`
+      UPDATE materials
+      SET artifact_id = $2::uuid,
+          metadata = metadata || jsonb_build_object('artifact_id', $2::text),
+          updated_at = now()
+      WHERE id = $1::uuid
+    `, [input.materialId, rows[0].id]);
+  }
+
+  return rows[0];
+}
+
+export async function upsertCapability(input: {
+  id?: string;
+  capabilityType: string;
+  name: string;
+  slug: string;
+  status: string;
+  scopeDepartment?: string;
+  scopeAgent?: string;
+  description: string;
+  instructions: string;
+  config: string;
+}) {
+  const config = input.config.trim() || "{}";
+  JSON.parse(config);
+
+  if (input.id) {
+    const rows = await queryRows<{ id: string }>(`
+      UPDATE office_capabilities
+      SET capability_type = $2,
+          name = $3,
+          slug = $4,
+          status = $5,
+          scope_department = NULLIF($6, ''),
+          scope_agent = NULLIF($7, ''),
+          description = $8,
+          instructions = $9,
+          config = $10::jsonb,
+          updated_at = now()
+      WHERE id = $1::uuid
+      RETURNING id::text
+    `, [
+      input.id,
+      input.capabilityType,
+      input.name,
+      input.slug,
+      input.status,
+      input.scopeDepartment ?? "",
+      input.scopeAgent ?? "",
+      input.description,
+      input.instructions,
+      config,
+    ]);
+    return rows[0];
+  }
+
+  const rows = await queryRows<{ id: string }>(`
+    INSERT INTO office_capabilities (capability_type, name, slug, status, scope_department, scope_agent, description, instructions, config)
+    VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, ''), $7, $8, $9::jsonb)
+    RETURNING id::text
+  `, [
+    input.capabilityType,
+    input.name,
+    input.slug,
+    input.status,
+    input.scopeDepartment ?? "",
+    input.scopeAgent ?? "",
+    input.description,
+    input.instructions,
+    config,
+  ]);
+  return rows[0];
+}
+
+export async function deleteCapability(id: string) {
+  const rows = await queryRows<{ id: string }>(`
+    UPDATE office_capabilities
+    SET status = 'archived', updated_at = now()
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [id]);
+  if (!rows[0]) throw new Error("Capability not found");
   return rows[0];
 }
