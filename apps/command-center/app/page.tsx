@@ -602,7 +602,7 @@ export default async function CommandCenterPage({
               <Card>
                 <CardHeader>
                   <CardTitle>Новая задача</CardTitle>
-                  <CardDescription>Создать задачу, построить маршрут и запустить первый шаг</CardDescription>
+                  <CardDescription>Отправить запрос главному ассистенту: маршрут и исполнителей определит офис</CardDescription>
                 </CardHeader>
                 <CardContent><TaskForm routes={state.routes} agents={state.agents} /></CardContent>
               </Card>
