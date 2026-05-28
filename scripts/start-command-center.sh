@@ -7,8 +7,19 @@ ensure_user_systemd
 root="$(repo_root)"
 service="ai-dev-office-command-center.service"
 port="${COMMAND_CENTER_PORT:-3310}"
+env_dir="$HOME/.config/ai-dev-office"
+env_file="$env_dir/command-center.env"
 
 mkdir -p "$HOME/.config/systemd/user"
+mkdir -p "$env_dir"
+if [[ ! -f "$env_file" ]]; then
+  umask 077
+  secret_key="$(openssl rand -base64 32)"
+  cat > "$env_file" <<ENV
+COMMAND_CENTER_SECRETS_KEY=$secret_key
+ENV
+fi
+chmod 600 "$env_file"
 cat > "$HOME/.config/systemd/user/$service" <<SERVICE
 [Unit]
 Description=AI Dev Office Command Center
@@ -17,6 +28,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$root/apps/command-center
+EnvironmentFile=$env_file
 Environment=NODE_ENV=production
 Environment=COMMAND_CENTER_PORT=$port
 Environment=COMMAND_CENTER_BASE_PATH=${COMMAND_CENTER_BASE_PATH:-}

@@ -104,6 +104,20 @@ export type CapabilityState = {
   updatedAt: string;
 };
 
+export type SecretState = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  status: string;
+  scopeDepartment?: string;
+  scopeAgent?: string;
+  description: string;
+  fingerprint?: string;
+  updatedAt: string;
+  lastUsedAt?: string;
+};
+
 export type DepartmentState = {
   id: string;
   name: string;
@@ -137,4 +151,5 @@ export type CommandCenterState = {
   events: EventState[];
   routes: RouteRuleState[];
   capabilities: CapabilityState[];
+  secrets: SecretState[];
 };

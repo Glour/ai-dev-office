@@ -12,6 +12,7 @@ import {
   PlusIcon,
   RouteIcon,
   ShieldCheckIcon,
+  KeyRoundIcon,
   WrenchIcon,
 } from "lucide-react";
 import { DepartmentsOrgChart } from "@/components/dashboard/departments-org-chart";
@@ -39,12 +40,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { loadCommandCenterState } from "./lib/office";
-import type { AgentState, CapabilityState, EventState, MaterialState, RouteRuleState } from "./lib/types";
+import { loadCommandCenterState, secretsVaultStatus } from "./lib/office";
+import type { AgentState, CapabilityState, EventState, MaterialState, RouteRuleState, SecretState } from "./lib/types";
 
 export const dynamic = "force-dynamic";
 
-type View = "overview" | "tasks" | "departments" | "agents" | "materials" | "capabilities" | "routes" | "events";
+type View = "overview" | "tasks" | "departments" | "agents" | "materials" | "capabilities" | "secrets" | "routes" | "events";
 
 const basePath = process.env.NEXT_PUBLIC_COMMAND_CENTER_BASE_PATH ?? process.env.COMMAND_CENTER_BASE_PATH ?? "";
 
@@ -55,6 +56,7 @@ const navItems: Array<{ view: View; label: string; description: string; icon: ty
   { view: "agents", label: "Агенты", description: "Runtime gateway", icon: BotIcon },
   { view: "materials", label: "Материалы", description: "База знаний", icon: LibraryIcon },
   { view: "capabilities", label: "Навыки", description: "Skills и tools", icon: WrenchIcon },
+  { view: "secrets", label: "Секреты", description: "Encrypted vault", icon: KeyRoundIcon },
   { view: "routes", label: "Маршруты", description: "Процессы", icon: RouteIcon },
   { view: "events", label: "Журнал", description: "События", icon: DatabaseIcon },
 ];
@@ -76,6 +78,12 @@ const statusLabels: Record<string, string> = {
   active: "активен",
   inactive: "выключен",
   disabled: "выключен",
+  login: "логин",
+  api_key: "API key",
+  ssh_key: "SSH key",
+  token: "токен",
+  cookie: "cookie",
+  env: "env",
   unknown: "неизвестно",
   low: "низкий",
   normal: "обычный",
@@ -473,6 +481,106 @@ function CapabilityForm({ agents, capability }: { agents: AgentState[]; capabili
   );
 }
 
+function SecretsVault({ agents, secrets }: { agents: AgentState[]; secrets: SecretState[] }) {
+  const vault = secretsVaultStatus();
+  return (
+    <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Добавить секрет</CardTitle>
+          <CardDescription>Значение шифруется на сервере и не показывается обратно в интерфейсе.</CardDescription>
+          <CardAction>
+            <Badge className={vault.configured ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"} variant="outline">
+              {vault.configured ? "vault key ok" : "vault key missing"}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent>
+          <SecretForm agents={agents} disabled={!vault.configured} />
+          {!vault.configured ? <p className="mt-3 text-sm text-red-600">{vault.message}</p> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Хранилище секретов</CardTitle>
+          <CardDescription>В UI видны только метаданные и ссылка вида secret://slug. Открытый текст не возвращается.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {secrets.map((secret) => (
+            <div className="rounded-xl border bg-background p-4" key={secret.id}>
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                  <KeyRoundIcon className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{secret.name}</p>
+                    <Badge variant="outline">{label(secret.type)}</Badge>
+                    <Badge className={toneClass(secret.status)} variant="outline">{label(secret.status)}</Badge>
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">secret://{secret.slug}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{secret.description || "Описание не задано"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {secret.scopeAgent ? `агент: ${secret.scopeAgent}` : secret.scopeDepartment ? `отдел: ${secret.scopeDepartment}` : "весь офис"}
+                    {secret.fingerprint ? ` · fp:${secret.fingerprint}` : ""}
+                  </p>
+                </div>
+                <form action={`${basePath}/api/secrets`} method="post">
+                  <input name="id" type="hidden" value={secret.id} />
+                  <Button name="action" size="sm" type="submit" value="delete" variant="destructive">Удалить</Button>
+                </form>
+              </div>
+            </div>
+          ))}
+          {secrets.length === 0 ? <p className="text-sm text-muted-foreground">Секретов пока нет.</p> : null}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SecretForm({ agents, disabled }: { agents: AgentState[]; disabled: boolean }) {
+  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+  const departments = Array.from(new Set(agents.map((agent) => agent.department))).sort();
+  return (
+    <form action={`${basePath}/api/secrets`} className="grid gap-3" method="post">
+      <fieldset className="grid gap-3" disabled={disabled}>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <select aria-label="Тип секрета" className={selectClass} defaultValue="generic" name="secretType">
+            <option value="generic">Generic</option>
+            <option value="login">Login/password</option>
+            <option value="api_key">API key</option>
+            <option value="ssh_key">SSH key</option>
+            <option value="token">Token</option>
+            <option value="cookie">Cookie</option>
+            <option value="env">Env</option>
+          </select>
+          <select aria-label="Статус" className={selectClass} defaultValue="active" name="status">
+            <option value="active">Активен</option>
+            <option value="disabled">Выключен</option>
+          </select>
+        </div>
+        <Input aria-label="Название секрета" name="name" placeholder="Название" required />
+        <Input aria-label="Slug секрета" name="slug" placeholder="slug для secret://slug" required />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <select aria-label="Отдел" className={selectClass} defaultValue="" name="scopeDepartment">
+            <option value="">Весь офис</option>
+            {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+          </select>
+          <select aria-label="Агент" className={selectClass} defaultValue="" name="scopeAgent">
+            <option value="">Не ограничивать агентом</option>
+            {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+          </select>
+        </div>
+        <Textarea aria-label="Описание секрета" name="description" placeholder="Для чего нужен секрет и кто может использовать" rows={3} />
+        <Textarea aria-label="Значение секрета" className="font-mono text-xs" name="secretValue" placeholder="Вставьте пароль, токен, SSH private key или JSON credentials" required rows={8} />
+        <Button type="submit"><KeyRoundIcon className="size-4" />Зашифровать и сохранить</Button>
+      </fieldset>
+    </form>
+  );
+}
+
 function MaterialTable({ materials }: { materials: MaterialState[] }) {
   return (
     <Table>
@@ -655,6 +763,10 @@ export default async function CommandCenterPage({
 
           {activeView === "capabilities" ? (
             <CapabilityManager agents={state.agents} capabilities={state.capabilities} />
+          ) : null}
+
+          {activeView === "secrets" ? (
+            <SecretsVault agents={state.agents} secrets={state.secrets} />
           ) : null}
 
           {activeView === "routes" ? (

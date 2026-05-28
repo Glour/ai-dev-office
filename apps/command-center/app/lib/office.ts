@@ -10,8 +10,10 @@ import type {
   DepartmentState,
   MaterialState,
   RouteRuleState,
+  SecretState,
   TaskState,
 } from "./types";
+import { encryptSecret, getSecretsKeyStatus } from "./secrets";
 
 const execFileAsync = promisify(execFile);
 
@@ -581,7 +583,7 @@ async function loadDatabaseState() {
     // The dashboard must stay available even if Hermes runtime is temporarily unavailable.
   }
 
-  const [tasks, taskSteps, taskArtifacts, taskQcResults, materials, events, routes, capabilities, failedQc] = await Promise.all([
+  const [tasks, taskSteps, taskArtifacts, taskQcResults, materials, events, routes, capabilities, secrets, failedQc] = await Promise.all([
     queryRows<{
       id: string;
       owner_request: string;
@@ -713,6 +715,26 @@ async function loadDatabaseState() {
       WHERE status <> 'archived'
       ORDER BY capability_type, name
     `),
+    queryRows<{
+      id: string;
+      name: string;
+      slug: string;
+      secret_type: string;
+      status: string;
+      scope_department: string | null;
+      scope_agent: string | null;
+      description: string;
+      fingerprint: string | null;
+      updated_at: string;
+      last_used_at: string | null;
+    }>(`
+      SELECT id::text, name, slug, secret_type, status, scope_department, scope_agent,
+             description, fingerprint, updated_at::text, last_used_at::text
+      FROM office_secrets
+      WHERE status <> 'archived'
+      ORDER BY updated_at DESC
+      LIMIT 120
+    `),
     queryRows<{ count: string }>("SELECT count(*)::text FROM qc_results WHERE status = 'failed'"),
   ]);
 
@@ -814,6 +836,19 @@ async function loadDatabaseState() {
       config: capability.config,
       updatedAt: capability.updated_at,
     })),
+    secrets: secrets.map<SecretState>((secret) => ({
+      id: secret.id,
+      name: secret.name,
+      slug: secret.slug,
+      type: secret.secret_type,
+      status: secret.status,
+      scopeDepartment: secret.scope_department ?? undefined,
+      scopeAgent: secret.scope_agent ?? undefined,
+      description: secret.description,
+      fingerprint: secret.fingerprint ?? undefined,
+      updatedAt: secret.updated_at,
+      lastUsedAt: secret.last_used_at ?? undefined,
+    })),
     failedQc: Number(failedQc[0]?.count ?? 0),
   };
 }
@@ -845,6 +880,7 @@ function fallbackState(agents: AgentState[], message: string): CommandCenterStat
     }],
     routes: [],
     capabilities: [],
+    secrets: [],
   };
 }
 
@@ -1234,5 +1270,99 @@ export async function deleteCapability(id: string) {
     RETURNING id::text
   `, [id]);
   if (!rows[0]) throw new Error("Capability not found");
+  return rows[0];
+}
+
+export function secretsVaultStatus() {
+  return getSecretsKeyStatus();
+}
+
+export async function upsertSecret(input: {
+  id?: string;
+  name: string;
+  slug: string;
+  secretType: string;
+  status: string;
+  scopeDepartment?: string;
+  scopeAgent?: string;
+  description: string;
+  secretValue: string;
+}) {
+  if (!input.secretValue.trim()) {
+    throw new Error("Secret value is required");
+  }
+
+  const encrypted = encryptSecret(input.secretValue);
+  if (input.id) {
+    const rows = await queryRows<{ id: string }>(`
+      UPDATE office_secrets
+      SET name = $2,
+          slug = $3,
+          secret_type = $4,
+          status = $5,
+          scope_department = NULLIF($6, ''),
+          scope_agent = NULLIF($7, ''),
+          description = $8,
+          ciphertext = $9,
+          iv = $10,
+          auth_tag = $11,
+          algorithm = $12,
+          fingerprint = $13,
+          updated_at = now()
+      WHERE id = $1::uuid
+      RETURNING id::text
+    `, [
+      input.id,
+      input.name,
+      input.slug,
+      input.secretType,
+      input.status,
+      input.scopeDepartment ?? "",
+      input.scopeAgent ?? "",
+      input.description,
+      encrypted.ciphertext,
+      encrypted.iv,
+      encrypted.authTag,
+      encrypted.algorithm,
+      encrypted.fingerprint,
+    ]);
+    return rows[0];
+  }
+
+  const rows = await queryRows<{ id: string }>(`
+    INSERT INTO office_secrets (name, slug, secret_type, status, scope_department, scope_agent, description, ciphertext, iv, auth_tag, algorithm, fingerprint)
+    VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, ''), $7, $8, $9, $10, $11, $12)
+    RETURNING id::text
+  `, [
+    input.name,
+    input.slug,
+    input.secretType,
+    input.status,
+    input.scopeDepartment ?? "",
+    input.scopeAgent ?? "",
+    input.description,
+    encrypted.ciphertext,
+    encrypted.iv,
+    encrypted.authTag,
+    encrypted.algorithm,
+    encrypted.fingerprint,
+  ]);
+
+  await queryRows(`
+    INSERT INTO events (event_type, actor, severity, message, payload)
+    VALUES ('secret.created', 'command-center', 'info', 'Секрет добавлен в защищенное хранилище', jsonb_build_object('secret_slug', $1::text, 'secret_type', $2::text))
+  `, [input.slug, input.secretType]);
+
+  return rows[0];
+}
+
+export async function deleteSecret(id: string) {
+  const rows = await queryRows<{ id: string }>(`
+    UPDATE office_secrets
+    SET status = 'archived', updated_at = now()
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [id]);
+  if (!rows[0]) throw new Error("Secret not found");
   return rows[0];
 }
