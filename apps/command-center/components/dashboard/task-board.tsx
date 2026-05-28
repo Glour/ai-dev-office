@@ -1,18 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
-import {
-  DndContext,
-  DragEndEvent,
-  DragStartEvent,
-  PointerSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { ArchiveIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +25,20 @@ const boardColumns = [
   { id: "done", title: "Готово", hint: "Закрытые и отданные результаты", states: ["done", "verified"], targetStatus: "done" },
   { id: "blocked", title: "Блокеры", hint: "Нужна реакция владельца", states: ["blocked", "failed"], targetStatus: "blocked" },
 ];
+
+type BoardColumn = typeof boardColumns[number];
+
+type DragState = {
+  task: TaskState;
+  pointerId: number;
+  offsetX: number;
+  offsetY: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  overColumnId: string | null;
+};
 
 const statusLabels: Record<string, string> = {
   new: "новая",
@@ -76,92 +80,160 @@ function toneClass(status: string) {
   return "border-border bg-muted text-muted-foreground";
 }
 
+function columnAtPoint(x: number, y: number) {
+  return boardColumns.find((column) => {
+    const element = document.querySelector<HTMLElement>(`[data-column-id="${column.id}"]`);
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }) ?? null;
+}
+
 export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
   const router = useRouter();
   const boardTasks = tasks.filter((task) => !["archived", "cancelled"].includes(task.status));
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const taskId = String(event.active.id);
-    const column = boardColumns.find((item) => item.id === event.over?.id);
-    setActiveTaskId(null);
-    if (!column) return;
+  useEffect(() => {
+    if (!dragState) return;
+    const activeDrag = dragState;
 
-    const task = boardTasks.find((item) => item.id === taskId);
-    if (!task || column.states.includes(task.status)) return;
-
-    setPendingTaskId(taskId);
-    try {
-      const response = await fetch("/api/tasks/status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, status: column.targetStatus }),
-      });
-      if (!response.ok) throw new Error(await response.text());
-      router.refresh();
-    } finally {
-      setPendingTaskId(null);
+    function handlePointerMove(event: globalThis.PointerEvent) {
+      if (event.pointerId !== activeDrag.pointerId) return;
+      const column = columnAtPoint(event.clientX, event.clientY);
+      setDragState((current) => current ? {
+        ...current,
+        x: event.clientX,
+        y: event.clientY,
+        overColumnId: column?.id ?? null,
+      } : null);
     }
-  }
 
-  function handleDragStart(event: DragStartEvent) {
-    setActiveTaskId(String(event.active.id));
+    async function handlePointerUp(event: globalThis.PointerEvent) {
+      if (event.pointerId !== activeDrag.pointerId) return;
+      const column = columnAtPoint(event.clientX, event.clientY);
+      const task = activeDrag.task;
+      setDragState(null);
+      if (!column || column.states.includes(task.status)) return;
+
+      setPendingTaskId(task.id);
+      try {
+        const response = await fetch("/api/tasks/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: task.id, status: column.targetStatus }),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        router.refresh();
+      } finally {
+        setPendingTaskId(null);
+      }
+    }
+
+    function handlePointerCancel(event: globalThis.PointerEvent) {
+      if (event.pointerId !== activeDrag.pointerId) return;
+      setDragState(null);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerCancel);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+    };
+  }, [dragState, router]);
+
+  function handleTaskPointerDown(event: ReactPointerEvent<HTMLDivElement>, task: TaskState) {
+    if (pendingTaskId === task.id || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button,a,input,select,textarea,form")) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragState({
+      task,
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      x: event.clientX,
+      y: event.clientY,
+      width: rect.width,
+      height: rect.height,
+      overColumnId: null,
+    });
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveTaskId(null)}>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="flex gap-2 overflow-x-auto border-b bg-background p-2">
-          {boardColumns.map((column) => {
-            const count = boardTasks.filter((task) => column.states.includes(task.status)).length;
-            return (
-              <a className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border bg-background px-2 text-xs font-medium" href={`#column-${column.id}`} key={column.id}>
-                {column.title}
-                <Badge variant="secondary">{count}</Badge>
-              </a>
-            );
-          })}
-        </div>
-        <div className="grid auto-cols-[minmax(270px,1fr)] grid-flow-col overflow-x-auto bg-background">
-          {boardColumns.map((column) => {
-            const columnTasks = boardTasks.filter((task) => column.states.includes(task.status));
-            return (
-              <KanbanColumn
-                activeTaskId={activeTaskId}
-                column={column}
-                key={column.id}
-                pendingTaskId={pendingTaskId}
-                tasks={columnTasks}
-              />
-            );
-          })}
-        </div>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex gap-2 overflow-x-auto border-b bg-background p-2">
+        {boardColumns.map((column) => {
+          const count = boardTasks.filter((task) => column.states.includes(task.status)).length;
+          return (
+            <a className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border bg-background px-2 text-xs font-medium" href={`#column-${column.id}`} key={column.id}>
+              {column.title}
+              <Badge variant="secondary">{count}</Badge>
+            </a>
+          );
+        })}
       </div>
-    </DndContext>
+      <div className="grid auto-cols-[minmax(270px,1fr)] grid-flow-col overflow-x-auto bg-background">
+        {boardColumns.map((column) => {
+          const columnTasks = boardTasks.filter((task) => column.states.includes(task.status));
+          return (
+            <KanbanColumn
+              column={column}
+              draggingTaskId={dragState?.task.id ?? null}
+              isOver={dragState?.overColumnId === column.id}
+              key={column.id}
+              onTaskPointerDown={handleTaskPointerDown}
+              pendingTaskId={pendingTaskId}
+              tasks={columnTasks}
+            />
+          );
+        })}
+      </div>
+      {dragState ? (
+        <div
+          className="pointer-events-none fixed z-[1000]"
+          data-drag-overlay
+          style={{
+            height: dragState.height,
+            left: dragState.x - dragState.offsetX,
+            top: dragState.y - dragState.offsetY,
+            width: dragState.width,
+            willChange: "left, top",
+          }}
+        >
+          <TaskCard dragging task={dragState.task} />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function KanbanColumn({
-  activeTaskId,
   column,
+  draggingTaskId,
+  isOver,
+  onTaskPointerDown,
   tasks,
   pendingTaskId,
 }: {
-  activeTaskId: string | null;
-  column: typeof boardColumns[number];
+  column: BoardColumn;
+  draggingTaskId: string | null;
+  isOver: boolean;
+  onTaskPointerDown: (event: ReactPointerEvent<HTMLDivElement>, task: TaskState) => void;
   tasks: TaskState[];
   pendingTaskId: string | null;
 }) {
-  const { isOver, setNodeRef } = useDroppable({ id: column.id });
-
   return (
     <section
       data-column-id={column.id}
       className={`min-h-[560px] border-r bg-background p-2 transition-colors last:border-r-0 ${isOver ? "bg-muted" : ""}`}
       id={`column-${column.id}`}
-      ref={setNodeRef}
     >
       <Card size="sm" className="mb-2 h-28 shadow-none">
         <CardHeader className="h-full">
@@ -180,36 +252,38 @@ function KanbanColumn({
             </CardContent>
           </Card>
         ) : null}
-        <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => (
-            <DraggableTaskCard dragging={activeTaskId === task.id} disabled={pendingTaskId === task.id} key={task.id} task={task} />
-          ))}
-        </SortableContext>
+        {tasks.map((task) => (
+          <DraggableTaskCard
+            dragging={draggingTaskId === task.id}
+            disabled={pendingTaskId === task.id}
+            key={task.id}
+            onPointerDown={onTaskPointerDown}
+            task={task}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-function DraggableTaskCard({ disabled, dragging, task }: { disabled?: boolean; dragging?: boolean; task: TaskState }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: task.id,
-    disabled,
-  });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
+function DraggableTaskCard({
+  disabled,
+  dragging,
+  onPointerDown,
+  task,
+}: {
+  disabled?: boolean;
+  dragging?: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>, task: TaskState) => void;
+  task: TaskState;
+}) {
   return (
     <div
+      className={`cursor-grab touch-none active:cursor-grabbing ${dragging ? "opacity-30" : ""}`}
       data-task-id={task.id}
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`cursor-grab touch-none active:cursor-grabbing ${isDragging ? "relative z-50 opacity-95" : ""}`}
+      onPointerDown={(event) => onPointerDown(event, task)}
     >
-      <TaskCard dragging={dragging || isDragging} pending={disabled} task={task} />
+      <TaskCard pending={disabled} task={task} />
     </div>
   );
 }
