@@ -335,12 +335,21 @@ type HermesKanbanSnapshot = {
 
 function commandCenterStatusFromHermes(status: string) {
   const normalized = status.toLowerCase();
-  if (["blocked", "failed"].includes(normalized)) return "blocked";
+  if (["blocked", "failed", "crashed"].includes(normalized)) return "blocked";
   if (["done", "completed", "succeeded"].includes(normalized)) return "done";
   if (["archived"].includes(normalized)) return "archived";
   if (["running", "in_progress"].includes(normalized)) return "running";
   if (["review", "qc"].includes(normalized)) return normalized;
   return "planned";
+}
+
+function isActiveHermesStatus(status: string) {
+  return ["running", "in_progress", "claimed", "queued"].includes(status.toLowerCase());
+}
+
+function isHermesRuntimeNoise(value?: string | null) {
+  if (!value) return false;
+  return /^pid \d+ not alive$/i.test(value.trim());
 }
 
 function hermesKanbanPath() {
@@ -382,7 +391,7 @@ for task_id in ids:
         summary = run["summary"]
     elif comment and comment["body"]:
         summary = comment["body"]
-    elif task["last_failure_error"]:
+    elif task["last_failure_error"] and task["status"] not in ("running", "in_progress", "claimed", "queued"):
         summary = task["last_failure_error"]
     elif task["result"]:
         summary = task["result"]
@@ -443,8 +452,11 @@ async function syncHermesKanbanState() {
     if (!snapshot) continue;
 
     const nextStatus = commandCenterStatusFromHermes(snapshot.status);
-    const summary = snapshot.summary?.slice(0, 2000) ?? null;
-    const result = snapshot.result?.slice(0, 12000) ?? summary;
+    const activeHermesTask = isActiveHermesStatus(snapshot.status);
+    const rawSummary = snapshot.summary?.slice(0, 2000) ?? null;
+    const rawResult = snapshot.result?.slice(0, 12000) ?? rawSummary;
+    const summary = activeHermesTask && isHermesRuntimeNoise(rawSummary) ? null : rawSummary;
+    const result = activeHermesTask && isHermesRuntimeNoise(rawResult) ? null : rawResult;
     const changed = task.status !== nextStatus
       || task.hermes_status !== snapshot.status
       || (task.hermes_summary ?? null) !== summary

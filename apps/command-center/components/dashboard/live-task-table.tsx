@@ -191,8 +191,7 @@ export function LiveTaskTable({
                   >
                     <td className="px-4 py-4 align-top">
                       <p className="line-clamp-1 font-medium">{task.title}</p>
-                      <p className="mt-1 line-clamp-2 text-muted-foreground">{task.ownerRequest}</p>
-                      {task.hermesSummary ? <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{task.hermesSummary}</p> : null}
+                      <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-muted-foreground">{task.ownerRequest}</p>
                     </td>
                     <td className="px-4 py-4 align-top">
                       <Badge className={toneClass(task.status)} variant="outline">
