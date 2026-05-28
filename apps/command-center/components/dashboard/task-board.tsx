@@ -307,6 +307,11 @@ function TaskCard({ dragging, pending, task }: { dragging?: boolean; pending?: b
             Сейчас: {task.runningStep}
           </p>
         ) : null}
+        {task.hermesSummary ? (
+          <p className={`mt-2 line-clamp-3 text-xs ${["blocked", "failed"].includes(task.status) ? "text-red-600" : "text-muted-foreground"}`}>
+            Hermes: {task.hermesSummary}
+          </p>
+        ) : null}
       </CardContent>
       <CardFooter className="justify-between text-xs text-muted-foreground">
         <span>{task.agent}</span>

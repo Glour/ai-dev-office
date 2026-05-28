@@ -165,6 +165,191 @@ export async function queryRows<T>(sql: string, params: unknown[] = []): Promise
   return result.rows as T[];
 }
 
+type HermesKanbanSnapshot = {
+  id: string;
+  status: string;
+  assignee?: string | null;
+  summary?: string | null;
+  lastComment?: string | null;
+};
+
+function commandCenterStatusFromHermes(status: string) {
+  const normalized = status.toLowerCase();
+  if (["blocked", "failed"].includes(normalized)) return "blocked";
+  if (["done", "completed", "succeeded"].includes(normalized)) return "done";
+  if (["archived"].includes(normalized)) return "archived";
+  if (["running", "in_progress"].includes(normalized)) return "running";
+  if (["review", "qc"].includes(normalized)) return normalized;
+  return "planned";
+}
+
+function hermesKanbanPath() {
+  const hermesHome = process.env.HERMES_RUNTIME_HOME ?? `${process.env.HOME ?? "/root"}/.hermes-ai-dev-office`;
+  return `${hermesHome}/kanban.db`;
+}
+
+async function readHermesKanbanSnapshots(hermesIds: string[]): Promise<Record<string, HermesKanbanSnapshot>> {
+  if (hermesIds.length === 0) return {};
+
+  const script = `
+import json
+import sqlite3
+import sys
+
+db_path = sys.argv[1]
+ids = json.loads(sys.argv[2])
+con = sqlite3.connect(db_path)
+con.row_factory = sqlite3.Row
+out = {}
+
+for task_id in ids:
+    task = con.execute(
+        "select id, status, assignee, result, last_failure_error from tasks where id = ?",
+        [task_id],
+    ).fetchone()
+    if not task:
+        continue
+    run = con.execute(
+        "select status, outcome, summary from task_runs where task_id = ? order by id desc limit 1",
+        [task_id],
+    ).fetchone()
+    comment = con.execute(
+        "select body from task_comments where task_id = ? order by id desc limit 1",
+        [task_id],
+    ).fetchone()
+    summary = None
+    if run and run["summary"]:
+        summary = run["summary"]
+    elif comment and comment["body"]:
+        summary = comment["body"]
+    elif task["last_failure_error"]:
+        summary = task["last_failure_error"]
+    elif task["result"]:
+        summary = task["result"]
+    out[task_id] = {
+        "id": task["id"],
+        "status": task["status"],
+        "assignee": task["assignee"],
+        "summary": summary,
+        "lastComment": comment["body"] if comment else None,
+    }
+
+print(json.dumps(out, ensure_ascii=False))
+`;
+
+  const { stdout } = await execFileAsync("python3", ["-c", script, hermesKanbanPath(), JSON.stringify(hermesIds)], {
+    timeout: 2500,
+    maxBuffer: 1024 * 1024,
+  });
+  return JSON.parse(stdout || "{}") as Record<string, HermesKanbanSnapshot>;
+}
+
+async function syncHermesKanbanState() {
+  const tracked = await queryRows<{
+    id: string;
+    status: string;
+    hermes_id: string | null;
+    hermes_status: string | null;
+    hermes_summary: string | null;
+  }>(`
+    SELECT id::text,
+           status,
+           metadata->>'hermes_kanban_task_id' AS hermes_id,
+           metadata->>'hermes_status' AS hermes_status,
+           metadata->>'hermes_summary' AS hermes_summary
+    FROM tasks
+    WHERE metadata ? 'hermes_kanban_task_id'
+      AND status NOT IN ('archived', 'cancelled')
+    ORDER BY updated_at DESC
+    LIMIT 60
+  `);
+
+  const hermesIds = tracked.map((task) => task.hermes_id).filter((id): id is string => Boolean(id));
+  const snapshots = await readHermesKanbanSnapshots(hermesIds);
+
+  for (const task of tracked) {
+    if (!task.hermes_id) continue;
+    const snapshot = snapshots[task.hermes_id];
+    if (!snapshot) continue;
+
+    const nextStatus = commandCenterStatusFromHermes(snapshot.status);
+    const summary = snapshot.summary?.slice(0, 2000) ?? null;
+    const changed = task.status !== nextStatus
+      || task.hermes_status !== snapshot.status
+      || (task.hermes_summary ?? null) !== summary;
+
+    if (!changed) continue;
+
+    await queryRows(`
+      UPDATE tasks
+      SET status = $2,
+          assigned_agent = COALESCE($3, assigned_agent),
+          updated_at = now(),
+          metadata = metadata || jsonb_build_object(
+            'hermes_status', $4::text,
+            'hermes_summary', $5::text,
+            'hermes_synced_at', now()
+          )
+      WHERE id = $1::uuid
+    `, [task.id, nextStatus, snapshot.assignee ?? null, snapshot.status, summary]);
+
+    if (nextStatus === "blocked") {
+      await queryRows(`
+        UPDATE task_steps
+        SET status = 'blocked',
+            completed_at = COALESCE(completed_at, now()),
+            output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
+        WHERE task_id = $1::uuid AND status = 'running'
+      `, [task.id, summary]);
+
+      await queryRows(`
+        UPDATE agent_runs
+        SET status = 'failed',
+            completed_at = COALESCE(completed_at, now()),
+            error = COALESCE($2::text, 'Hermes Kanban blocked the task')
+        WHERE task_id = $1::uuid AND status = 'running'
+      `, [task.id, summary]);
+    }
+
+    if (nextStatus === "done") {
+      await queryRows(`
+        UPDATE task_steps
+        SET status = 'done',
+            completed_at = COALESCE(completed_at, now()),
+            output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
+        WHERE task_id = $1::uuid AND status = 'running'
+      `, [task.id, summary]);
+
+      await queryRows(`
+        UPDATE agent_runs
+        SET status = 'succeeded',
+            completed_at = COALESCE(completed_at, now()),
+            output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
+        WHERE task_id = $1::uuid AND status = 'running'
+      `, [task.id, summary]);
+    }
+
+    await queryRows(`
+      INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+      VALUES (
+        $1::uuid,
+        'hermes.kanban.synced',
+        'command-center',
+        CASE WHEN $2 = 'blocked' THEN 'warn' ELSE 'info' END,
+        $3,
+        jsonb_build_object('hermes_task_id', $4::text, 'hermes_status', $5::text, 'summary', $6::text)
+      )
+    `, [
+      task.id,
+      nextStatus,
+      nextStatus === "blocked" ? "Hermes Kanban заблокировал задачу" : "Статус синхронизирован из Hermes Kanban",
+      task.hermes_id,
+      snapshot.status,
+      summary,
+    ]);
+  }
+}
+
 async function serviceStatus(agentId: string): Promise<Pick<AgentState, "status" | "pid">> {
   const service = `hermes-gateway-ai-dev-office@${agentId}.service`;
   try {
@@ -218,6 +403,12 @@ async function loadAgents(): Promise<AgentState[]> {
 }
 
 async function loadDatabaseState() {
+  try {
+    await syncHermesKanbanState();
+  } catch {
+    // The dashboard must stay available even if Hermes runtime is temporarily unavailable.
+  }
+
   const [tasks, materials, events, routes, failedQc] = await Promise.all([
     queryRows<{
       id: string;
@@ -232,9 +423,13 @@ async function loadDatabaseState() {
       updated_at: string;
       step_count: string;
       running_step: string | null;
+      hermes_status: string | null;
+      hermes_summary: string | null;
     }>(`
       SELECT id::text, owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level,
              created_at::text, updated_at::text,
+             metadata->>'hermes_status' AS hermes_status,
+             metadata->>'hermes_summary' AS hermes_summary,
              (SELECT count(*)::text FROM task_steps WHERE task_steps.task_id = tasks.id) AS step_count,
              (SELECT title FROM task_steps WHERE task_steps.task_id = tasks.id AND task_steps.status = 'running' ORDER BY step_order LIMIT 1) AS running_step
       FROM tasks
@@ -298,6 +493,8 @@ async function loadDatabaseState() {
       riskLevel: task.risk_level,
       stepCount: Number(task.step_count ?? 0),
       runningStep: task.running_step ?? undefined,
+      hermesStatus: task.hermes_status ?? undefined,
+      hermesSummary: task.hermes_summary ?? undefined,
       createdAt: task.created_at,
       updatedAt: task.updated_at,
     })),

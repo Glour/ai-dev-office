@@ -394,6 +394,11 @@ function TaskTable({ tasks, redirect = "/?view=tasks" }: { tasks: TaskState[]; r
               <div className="max-w-48">
                 <p className="line-clamp-1">{task.runningStep ?? "нет активного шага"}</p>
                 <p className="text-xs text-muted-foreground">{task.stepCount} шагов</p>
+                {task.hermesSummary ? (
+                  <p className={`mt-1 line-clamp-2 text-xs ${["blocked", "failed"].includes(task.status) ? "text-red-600" : "text-muted-foreground"}`}>
+                    {task.hermesSummary}
+                  </p>
+                ) : null}
               </div>
             </TableCell>
             <TableCell>{task.routeType}</TableCell>

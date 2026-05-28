@@ -22,6 +22,8 @@ export type TaskState = {
   riskLevel: string;
   stepCount: number;
   runningStep?: string;
+  hermesStatus?: string;
+  hermesSummary?: string;
   createdAt: string;
   updatedAt: string;
 };
