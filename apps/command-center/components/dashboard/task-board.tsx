@@ -160,6 +160,7 @@ function KanbanColumn({
 
   return (
     <section
+      data-column-id={column.id}
       className={`min-h-[560px] border-r bg-background p-2 transition-colors last:border-r-0 ${isOver ? "bg-muted" : ""}`}
       id={`column-${column.id}`}
       ref={setNodeRef}
@@ -198,6 +199,7 @@ function DraggableTaskCard({ disabled, task }: { disabled?: boolean; task: TaskS
 
   return (
     <div
+      data-task-id={task.id}
       ref={setNodeRef}
       style={style}
       {...listeners}
