@@ -265,8 +265,16 @@ function TaskDetailsModal({
   task: TaskState;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 p-4" role="dialog" aria-modal="true">
-      <div className="max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-2xl border bg-background shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -284,28 +292,49 @@ function TaskDetailsModal({
           </div>
         </div>
 
-        <div className="grid max-h-[calc(88vh-88px)] gap-5 overflow-y-auto p-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="grid gap-4">
-            <DetailBlock title="Запрос">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{task.ownerRequest}</p>
-            </DetailBlock>
+        <div className="grid min-h-0 gap-4 overflow-y-auto p-5">
+          <DetailBlock title="Запрос">
+            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{task.ownerRequest}</p>
+          </DetailBlock>
 
-            <DetailBlock title="Результат">
-              {task.result ? (
-                <p className="whitespace-pre-wrap text-sm leading-6">{task.result}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">Результат еще не записан. Когда агент завершит работу или заблокирует задачу, итог появится здесь.</p>
-              )}
-            </DetailBlock>
+          <DetailBlock title="Результат">
+            {task.result ? (
+              <p className="whitespace-pre-wrap break-words text-sm leading-6">{task.result}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Результат еще не записан. Когда агент завершит работу или заблокирует задачу, итог появится здесь.</p>
+            )}
+          </DetailBlock>
 
+          <DetailBlock title="Шаги">
+            <div className="grid gap-2">
+              {task.steps.map((step, index) => (
+                <div className="min-w-0 rounded-lg border px-3 py-2" key={step.id}>
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs">{index + 1}</span>
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium">{step.title}</p>
+                    <Badge className={toneClass(step.status)} variant="outline">{label(step.status)}</Badge>
+                  </div>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">{step.assignedAgent ?? "агент не назначен"}{step.toolName ? ` · ${step.toolName}` : ""}</p>
+                  {normalizeOutput(step.output) ? (
+                    <pre className="mt-2 max-h-40 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-2 text-xs leading-5">
+                      {normalizeOutput(step.output)}
+                    </pre>
+                  ) : null}
+                </div>
+              ))}
+              {task.steps.length === 0 ? <p className="text-sm text-muted-foreground">Шаги еще не созданы.</p> : null}
+            </div>
+          </DetailBlock>
+
+          <div className="grid gap-4 lg:grid-cols-2">
             <DetailBlock title="Артефакты">
               {task.artifacts.length > 0 ? (
                 <div className="grid gap-2">
                   {task.artifacts.map((artifact) => (
-                    <a className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted" href={artifact.uri} key={artifact.id}>
-                      <FileTextIcon className="size-4 text-muted-foreground" />
-                      <span className="font-medium">{artifact.title}</span>
-                      <span className="ml-auto text-xs text-muted-foreground">{artifact.type}</span>
+                    <a className="flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted" href={artifact.uri} key={artifact.id}>
+                      <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate font-medium">{artifact.title}</span>
+                      <span className="text-xs text-muted-foreground">{artifact.type}</span>
                     </a>
                   ))}
                 </div>
@@ -313,48 +342,29 @@ function TaskDetailsModal({
                 <p className="text-sm text-muted-foreground">Файлы, отчеты и документы по этой задаче пока не прикреплены.</p>
               )}
             </DetailBlock>
-          </section>
-
-          <aside className="grid gap-4">
-            <DetailBlock title="Шаги">
-              <div className="grid gap-2">
-                {task.steps.map((step, index) => (
-                  <div className="rounded-lg border px-3 py-2" key={step.id}>
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs">{index + 1}</span>
-                      <p className="min-w-0 flex-1 text-sm font-medium">{step.title}</p>
-                      <Badge className={toneClass(step.status)} variant="outline">{label(step.status)}</Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{step.assignedAgent ?? "агент не назначен"}{step.toolName ? ` · ${step.toolName}` : ""}</p>
-                    {normalizeOutput(step.output) ? <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted p-2 text-xs">{normalizeOutput(step.output)}</pre> : null}
-                  </div>
-                ))}
-                {task.steps.length === 0 ? <p className="text-sm text-muted-foreground">Шаги еще не созданы.</p> : null}
-              </div>
-            </DetailBlock>
 
             <DetailBlock title="QC">
               {task.qcResults.length > 0 ? task.qcResults.map((result) => (
                 <div className="rounded-lg border px-3 py-2" key={result.id}>
                   <Badge className={toneClass(result.status)} variant="outline">{label(result.status)}</Badge>
-                  <p className="mt-2 text-sm">{result.summary}</p>
+                  <p className="mt-2 break-words text-sm">{result.summary}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{result.gate} · {formatDate(result.createdAt)}</p>
                 </div>
               )) : <p className="text-sm text-muted-foreground">QC еще не запускался.</p>}
             </DetailBlock>
+          </div>
 
-            <DetailBlock title="События">
-              <div className="grid gap-2">
-                {task.events.map((event) => (
-                  <div className="rounded-lg border px-3 py-2" key={event.id}>
-                    <p className="text-sm">{event.message}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{event.actor} · {event.eventType} · {formatDate(event.createdAt)}</p>
-                  </div>
-                ))}
-                {task.events.length === 0 ? <p className="text-sm text-muted-foreground">Событий по задаче пока нет.</p> : null}
-              </div>
-            </DetailBlock>
-          </aside>
+          <DetailBlock title="События">
+            <div className="grid gap-2">
+              {task.events.map((event) => (
+                <div className="rounded-lg border px-3 py-2" key={event.id}>
+                  <p className="break-words text-sm">{event.message}</p>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">{event.actor} · {event.eventType} · {formatDate(event.createdAt)}</p>
+                </div>
+              ))}
+              {task.events.length === 0 ? <p className="text-sm text-muted-foreground">Событий по задаче пока нет.</p> : null}
+            </div>
+          </DetailBlock>
         </div>
       </div>
     </div>
@@ -363,7 +373,7 @@ function TaskDetailsModal({
 
 function DetailBlock({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <section className="rounded-xl border bg-background p-4">
+    <section className="min-w-0 rounded-xl border bg-background p-4">
       <h3 className="mb-3 text-sm font-semibold">{title}</h3>
       {children}
     </section>
