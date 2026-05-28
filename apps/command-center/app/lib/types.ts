@@ -24,8 +24,40 @@ export type TaskState = {
   runningStep?: string;
   hermesStatus?: string;
   hermesSummary?: string;
+  result?: string;
+  steps: TaskStepState[];
+  events: EventState[];
+  artifacts: ArtifactState[];
+  qcResults: QcResultState[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type TaskStepState = {
+  id: string;
+  title: string;
+  status: string;
+  assignedAgent?: string;
+  toolName?: string;
+  output?: string;
+  startedAt?: string;
+  completedAt?: string;
+};
+
+export type ArtifactState = {
+  id: string;
+  title: string;
+  type: string;
+  uri: string;
+  createdAt: string;
+};
+
+export type QcResultState = {
+  id: string;
+  status: string;
+  gate: string;
+  summary: string;
+  createdAt: string;
 };
 
 export type MaterialState = {

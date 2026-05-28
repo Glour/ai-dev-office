@@ -288,6 +288,7 @@ async function syncHermesKanbanState() {
           metadata = metadata || jsonb_build_object(
             'hermes_status', $4::text,
             'hermes_summary', $5::text,
+            'hermes_result', $5::text,
             'hermes_synced_at', now()
           )
       WHERE id = $1::uuid
@@ -409,7 +410,7 @@ async function loadDatabaseState() {
     // The dashboard must stay available even if Hermes runtime is temporarily unavailable.
   }
 
-  const [tasks, materials, events, routes, failedQc] = await Promise.all([
+  const [tasks, taskSteps, taskArtifacts, taskQcResults, materials, events, routes, failedQc] = await Promise.all([
     queryRows<{
       id: string;
       owner_request: string;
@@ -425,16 +426,61 @@ async function loadDatabaseState() {
       running_step: string | null;
       hermes_status: string | null;
       hermes_summary: string | null;
+      result: string | null;
     }>(`
       SELECT id::text, owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level,
              created_at::text, updated_at::text,
              metadata->>'hermes_status' AS hermes_status,
              metadata->>'hermes_summary' AS hermes_summary,
+             metadata->>'hermes_result' AS result,
              (SELECT count(*)::text FROM task_steps WHERE task_steps.task_id = tasks.id) AS step_count,
              (SELECT title FROM task_steps WHERE task_steps.task_id = tasks.id AND task_steps.status = 'running' ORDER BY step_order LIMIT 1) AS running_step
       FROM tasks
       ORDER BY updated_at DESC
       LIMIT 60
+    `),
+    queryRows<{
+      id: string;
+      task_id: string;
+      title: string;
+      status: string;
+      assigned_agent: string | null;
+      tool_name: string | null;
+      output: string;
+      started_at: string | null;
+      completed_at: string | null;
+    }>(`
+      SELECT id::text, task_id::text, title, status, assigned_agent, tool_name, output::text,
+             started_at::text, completed_at::text
+      FROM task_steps
+      WHERE task_id IN (SELECT id FROM tasks ORDER BY updated_at DESC LIMIT 60)
+      ORDER BY task_id, step_order
+    `),
+    queryRows<{
+      id: string;
+      task_id: string | null;
+      artifact_type: string;
+      title: string;
+      uri: string;
+      created_at: string;
+    }>(`
+      SELECT id::text, task_id::text, artifact_type, title, uri, created_at::text
+      FROM artifacts
+      WHERE task_id IN (SELECT id FROM tasks ORDER BY updated_at DESC LIMIT 60)
+      ORDER BY created_at DESC
+    `),
+    queryRows<{
+      id: string;
+      task_id: string;
+      status: string;
+      gate: string;
+      summary: string;
+      created_at: string;
+    }>(`
+      SELECT id::text, task_id::text, status, gate, summary, created_at::text
+      FROM qc_results
+      WHERE task_id IN (SELECT id FROM tasks ORDER BY updated_at DESC LIMIT 60)
+      ORDER BY created_at DESC
     `),
     queryRows<{
       id: string;
@@ -481,23 +527,63 @@ async function loadDatabaseState() {
   ]);
 
   return {
-    tasks: tasks.map<TaskState>((task, index) => ({
-      id: task.id,
-      title: task.owner_request.split("\n")[0]?.slice(0, 96) || `Задача ${index + 1}`,
-      ownerRequest: task.owner_request,
-      status: task.status,
-      routeType: task.route_type,
-      department: task.assigned_department,
-      agent: task.assigned_agent,
-      priority: task.priority,
-      riskLevel: task.risk_level,
-      stepCount: Number(task.step_count ?? 0),
-      runningStep: task.running_step ?? undefined,
-      hermesStatus: task.hermes_status ?? undefined,
-      hermesSummary: task.hermes_summary ?? undefined,
-      createdAt: task.created_at,
-      updatedAt: task.updated_at,
-    })),
+    tasks: tasks.map<TaskState>((task, index) => {
+      const steps = taskSteps.filter((step) => step.task_id === task.id);
+      const artifacts = taskArtifacts.filter((artifact) => artifact.task_id === task.id);
+      const qcResults = taskQcResults.filter((result) => result.task_id === task.id);
+      const taskEvents = events.filter((event) => event.task_id === task.id);
+      return {
+        id: task.id,
+        title: task.owner_request.split("\n")[0]?.slice(0, 96) || `Задача ${index + 1}`,
+        ownerRequest: task.owner_request,
+        status: task.status,
+        routeType: task.route_type,
+        department: task.assigned_department,
+        agent: task.assigned_agent,
+        priority: task.priority,
+        riskLevel: task.risk_level,
+        stepCount: Number(task.step_count ?? 0),
+        runningStep: task.running_step ?? undefined,
+        hermesStatus: task.hermes_status ?? undefined,
+        hermesSummary: task.hermes_summary ?? undefined,
+        result: task.result ?? task.hermes_summary ?? undefined,
+        steps: steps.map((step) => ({
+          id: step.id,
+          title: step.title,
+          status: step.status,
+          assignedAgent: step.assigned_agent ?? undefined,
+          toolName: step.tool_name ?? undefined,
+          output: step.output,
+          startedAt: step.started_at ?? undefined,
+          completedAt: step.completed_at ?? undefined,
+        })),
+        events: taskEvents.map<EventState>((event) => ({
+          id: event.id,
+          taskId: event.task_id ?? undefined,
+          eventType: event.event_type,
+          actor: event.actor,
+          severity: event.severity,
+          message: event.message,
+          createdAt: event.created_at,
+        })),
+        artifacts: artifacts.map((artifact) => ({
+          id: artifact.id,
+          title: artifact.title,
+          type: artifact.artifact_type,
+          uri: artifact.uri,
+          createdAt: artifact.created_at,
+        })),
+        qcResults: qcResults.map((result) => ({
+          id: result.id,
+          status: result.status,
+          gate: result.gate,
+          summary: result.summary,
+          createdAt: result.created_at,
+        })),
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+      };
+    }),
     materials: materials.map<MaterialState>((material) => ({
       id: material.id,
       title: material.title,
