@@ -253,6 +253,36 @@ function AgentList({ agents }: { agents: AgentState[] }) {
   );
 }
 
+function AgentSummary({ agents }: { agents: AgentState[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Состояние агентов</CardTitle>
+        <CardDescription>Короткая сводка runtime без боковой панели</CardDescription>
+        <CardAction>
+          <Button asChild size="sm" variant="outline">
+            <a href={viewHref("agents")}>Все агенты</a>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {agents.map((agent) => (
+            <div className="flex min-h-12 items-center gap-2 rounded-lg border bg-background px-3" key={agent.id}>
+              <span className={`size-2 rounded-full ${agent.status === "active" ? "bg-emerald-400" : "bg-muted-foreground/30"}`} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{agent.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{agent.department}</p>
+              </div>
+              <Badge className={toneClass(agent.status)} variant="outline">{label(agent.status)}</Badge>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentState[] }) {
   const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
   return (
@@ -486,9 +516,7 @@ export default async function CommandCenterPage({
                 </CardHeader>
                 <CardContent><TaskTable tasks={state.tasks.slice(0, 12)} /></CardContent>
               </Card>
-              <section>
-                <AgentList agents={state.agents} />
-              </section>
+              <AgentSummary agents={state.agents} />
             </>
           ) : null}
 
