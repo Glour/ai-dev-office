@@ -282,6 +282,34 @@ export async function createTask(input: {
   return rows[0];
 }
 
+export async function updateTaskStatus(input: {
+  taskId: string;
+  status: string;
+}) {
+  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "cancelled", "failed"]);
+  if (!allowed.has(input.status)) {
+    throw new Error(`Unsupported task status: ${input.status}`);
+  }
+
+  const rows = await queryRows<{ id: string }>(`
+    UPDATE tasks
+    SET status = $2, updated_at = now()
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [input.taskId, input.status]);
+
+  if (!rows[0]) {
+    throw new Error("Task not found");
+  }
+
+  await queryRows(`
+    INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+    VALUES ($1::uuid, 'task.status.changed', 'command-center', 'info', 'Статус задачи изменен на доске', jsonb_build_object('status', $2::text))
+  `, [input.taskId, input.status]);
+
+  return rows[0];
+}
+
 export async function createMaterial(input: {
   title: string;
   materialType: string;

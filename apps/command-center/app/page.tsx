@@ -6,13 +6,13 @@ import {
   ClipboardListIcon,
   DatabaseIcon,
   FileTextIcon,
-  GitBranchIcon,
   LayoutDashboardIcon,
   LibraryIcon,
   PlusIcon,
   RouteIcon,
   ShieldCheckIcon,
 } from "lucide-react";
+import { TaskBoard } from "@/components/dashboard/task-board";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,15 +51,6 @@ const navItems: Array<{ view: View; label: string; description: string; icon: ty
   { view: "materials", label: "Материалы", description: "База знаний", icon: LibraryIcon },
   { view: "routes", label: "Маршруты", description: "Процессы", icon: RouteIcon },
   { view: "events", label: "Журнал", description: "События", icon: DatabaseIcon },
-];
-
-const boardColumns = [
-  { id: "planned", title: "План", hint: "Сформулированы и ждут движения", states: ["new", "planned"] },
-  { id: "work", title: "В работе", hint: "Исполнитель уже подключен", states: ["running"] },
-  { id: "review", title: "Review", hint: "Код, логика или результат на проверке", states: ["review"] },
-  { id: "qc", title: "QC", hint: "Финальный контроль качества", states: ["qc"] },
-  { id: "done", title: "Готово", hint: "Закрытые и отданные результаты", states: ["done", "verified"] },
-  { id: "blocked", title: "Блокеры", hint: "Нужна реакция владельца", states: ["blocked", "failed"] },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -121,7 +112,7 @@ function toneClass(status: string) {
 function Sidebar({ activeView }: { activeView: View }) {
   return (
     <aside className="sticky top-0 hidden h-svh w-64 shrink-0 border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col">
-      <div className="p-3">
+      <div className="flex min-h-14 items-center px-3">
         <a className="flex min-h-12 items-center gap-3 rounded-lg px-2" href={viewHref("overview")}>
           <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">AI</span>
           <span className="grid min-w-0 leading-tight">
@@ -220,7 +211,7 @@ function StatCard({
   description: string;
 }) {
   return (
-    <Card className="@container/card bg-gradient-to-t from-primary/5 to-card shadow-xs">
+    <Card className="@container/card shadow-xs">
       <CardHeader>
         <CardDescription>{label}</CardDescription>
         <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">{value}</CardTitle>
@@ -233,67 +224,6 @@ function StatCard({
       </CardHeader>
       <CardFooter className="text-sm text-muted-foreground">{description}</CardFooter>
     </Card>
-  );
-}
-
-function TaskBoard({ tasks }: { tasks: TaskState[] }) {
-  return (
-    <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="flex gap-2 overflow-x-auto border-b bg-muted/35 p-2">
-        {boardColumns.map((column) => {
-          const count = tasks.filter((task) => column.states.includes(task.status)).length;
-          return (
-            <a className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border bg-background px-2 text-xs font-medium" href={`#column-${column.id}`} key={column.id}>
-              {column.title}
-              <Badge variant="secondary">{count}</Badge>
-            </a>
-          );
-        })}
-      </div>
-      <div className="grid auto-cols-[minmax(250px,1fr)] grid-flow-col overflow-x-auto">
-        {boardColumns.map((column) => {
-          const columnTasks = tasks.filter((task) => column.states.includes(task.status));
-          return (
-            <section className="min-h-[520px] border-r bg-muted/30 p-2 last:border-r-0" id={`column-${column.id}`} key={column.id}>
-              <Card size="sm" className="mb-2 shadow-none">
-                <CardHeader>
-                  <CardTitle>{column.title}</CardTitle>
-                  <CardDescription>{column.hint}</CardDescription>
-                  <CardAction>
-                    <Badge variant="outline">{columnTasks.length}</Badge>
-                  </CardAction>
-                </CardHeader>
-              </Card>
-              <div className="grid gap-2">
-                {columnTasks.length === 0 ? (
-                  <Card size="sm" className="border-dashed shadow-none">
-                    <CardContent className="flex min-h-20 items-center justify-center text-sm text-muted-foreground">Пусто</CardContent>
-                  </Card>
-                ) : null}
-                {columnTasks.map((task) => (
-                  <Card size="sm" className="shadow-xs" key={task.id}>
-                    <CardHeader>
-                      <CardDescription className="flex items-center justify-between gap-2">
-                        <Badge className={toneClass(task.status)} variant="outline">{label(task.status)}</Badge>
-                        <span>{formatDate(task.updatedAt)}</span>
-                      </CardDescription>
-                      <CardTitle className="line-clamp-3">{task.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="line-clamp-4 text-sm text-muted-foreground">{task.ownerRequest}</p>
-                    </CardContent>
-                    <CardFooter className="justify-between text-xs text-muted-foreground">
-                      <span>{task.agent}</span>
-                      <span>{label(task.priority)}</span>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -544,17 +474,19 @@ export default async function CommandCenterPage({
                 <StatCard icon={LibraryIcon} label="Материалы" value={state.totals.materials} description="в библиотеке" />
                 <StatCard icon={ShieldCheckIcon} label="QC ошибки" value={state.totals.failedQc} description="по последним проверкам" />
               </section>
-              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.45fr)]">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Доска задач</CardTitle>
-                    <CardDescription>Основной поток AI Dev Office</CardDescription>
-                    <CardAction><GitBranchIcon className="size-4 text-muted-foreground" /></CardAction>
-                  </CardHeader>
-                  <CardContent>
-                    <TaskBoard tasks={state.tasks} />
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Последние задачи</CardTitle>
+                  <CardDescription>Рабочий список без канбан-перегруза</CardDescription>
+                  <CardAction>
+                    <Button asChild size="sm" variant="outline">
+                      <a href={viewHref("tasks")}>Открыть канбан</a>
+                    </Button>
+                  </CardAction>
+                </CardHeader>
+                <CardContent><TaskTable tasks={state.tasks.slice(0, 12)} /></CardContent>
+              </Card>
+              <section>
                 <AgentList agents={state.agents} />
               </section>
             </>
@@ -584,13 +516,16 @@ export default async function CommandCenterPage({
           ) : null}
 
           {activeView === "agents" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Runtime агентов</CardTitle>
-                <CardDescription>Сервисы, PID и отделы</CardDescription>
-              </CardHeader>
-              <CardContent><AgentTable agents={state.agents} /></CardContent>
-            </Card>
+            <>
+              <AgentList agents={state.agents} />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Runtime агентов</CardTitle>
+                  <CardDescription>Сервисы, PID и отделы</CardDescription>
+                </CardHeader>
+                <CardContent><AgentTable agents={state.agents} /></CardContent>
+              </Card>
+            </>
           ) : null}
 
           {activeView === "materials" ? (

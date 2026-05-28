@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server";
 import { createTask } from "@/app/lib/office";
 
 export const dynamic = "force-dynamic";
+
+function redirectTo(location: string) {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: location },
+  });
+}
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -13,9 +19,9 @@ export async function POST(request: Request) {
   const riskLevel = String(form.get("riskLevel") ?? "medium").trim();
 
   if (!ownerRequest) {
-    return NextResponse.redirect(new URL("/?error=empty-task", request.url));
+    return redirectTo("/?view=tasks&error=empty-task");
   }
 
   await createTask({ ownerRequest, routeType, assignedDepartment, assignedAgent, priority, riskLevel });
-  return NextResponse.redirect(new URL("/", request.url));
+  return redirectTo("/?view=tasks&created=1");
 }
