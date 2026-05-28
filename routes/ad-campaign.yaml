@@ -1,0 +1,22 @@
+route_type: ad_campaign
+department: marketing
+primary_agent: ads-specialist
+owner_outcome: advertising plan, tracking checklist, and approval-ready launch package
+flow:
+  - step: classify
+    agent: orchestrator
+  - step: campaign_brief
+    agent: ads-specialist
+  - step: tracking_plan
+    agent: ads-specialist
+    tools:
+      - yandex-metrica
+      - yandex-direct
+      - yandex-webmaster
+  - step: security_privacy_review
+    agent: security-officer
+  - step: qc
+    agent: qa-lead
+  - step: owner_approval
+    agent: owner-assistant
+approval: before-spend

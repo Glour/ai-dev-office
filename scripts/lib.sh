@@ -7,6 +7,11 @@ profiles=(
   dev-builder
   dev-reviewer
   qa-lead
+  seo-strategist
+  marketing-researcher
+  content-writer
+  ads-specialist
+  security-officer
   materials-librarian
   daily-auditor
 )

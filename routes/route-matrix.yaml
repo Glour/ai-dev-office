@@ -58,3 +58,87 @@ routes:
       - improvement-tasks
     qc_gate: none
     approval: before-route-change
+  content_production:
+    department: marketing
+    owner_outcome: research-backed content draft ready for human approval
+    primary_agent: seo-strategist
+    flow:
+      - orchestrator
+      - seo-strategist
+      - marketing-researcher
+      - content-writer
+      - seo-strategist
+      - qa-lead
+      - materials-librarian
+      - owner-assistant
+    qc_gate: content-and-facts
+    approval: before-publication
+  seo_brief:
+    department: marketing
+    owner_outcome: SEO brief with intent, structure, keywords, and risks
+    primary_agent: seo-strategist
+    flow:
+      - seo-strategist
+      - owner-assistant
+    qc_gate: none
+    approval: no
+  marketing_research:
+    department: marketing
+    owner_outcome: source-backed research report
+    primary_agent: marketing-researcher
+    flow:
+      - marketing-researcher
+      - owner-assistant
+    qc_gate: facts-and-sources
+    approval: no
+  content_rewrite:
+    department: marketing
+    owner_outcome: rewritten text aligned with style guide and SEO intent
+    primary_agent: content-writer
+    flow:
+      - content-writer
+      - seo-strategist
+      - qa-lead
+      - owner-assistant
+    qc_gate: content-review
+    approval: by-risk
+  seo_review:
+    department: marketing
+    owner_outcome: SEO review and improvement list
+    primary_agent: seo-strategist
+    flow:
+      - seo-strategist
+      - owner-assistant
+    qc_gate: none
+    approval: no
+  ad_campaign:
+    department: marketing
+    owner_outcome: advertising campaign plan or controlled launch checklist
+    primary_agent: ads-specialist
+    flow:
+      - orchestrator
+      - ads-specialist
+      - security-officer
+      - qa-lead
+      - owner-assistant
+    qc_gate: advertising-and-tracking
+    approval: before-spend
+  security_review:
+    department: security
+    owner_outcome: security risk assessment and go/no-go decision
+    primary_agent: security-officer
+    flow:
+      - security-officer
+      - owner-assistant
+    qc_gate: security
+    approval: by-risk
+  release_security_gate:
+    department: security
+    owner_outcome: release security decision
+    primary_agent: security-officer
+    flow:
+      - security-officer
+      - qa-lead
+      - owner-assistant
+    qc_gate: security
+    approval: yes

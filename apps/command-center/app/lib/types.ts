@@ -90,6 +90,19 @@ export type RouteRuleState = {
   approvalRequired: boolean;
 };
 
+export type DepartmentState = {
+  id: string;
+  name: string;
+  mission: string;
+  lead: string;
+  responsibilities: string[];
+  tools: string[];
+  flows: string[];
+  products: string[];
+  agentIds: string[];
+  routeTypes: string[];
+};
+
 export type CommandCenterState = {
   mode: "live" | "fallback";
   checkedAt: string;
@@ -104,6 +117,7 @@ export type CommandCenterState = {
     failedQc: number;
   };
   agents: AgentState[];
+  departments: DepartmentState[];
   tasks: TaskState[];
   materials: MaterialState[];
   events: EventState[];

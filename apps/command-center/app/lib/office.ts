@@ -6,6 +6,7 @@ import type {
   AgentState,
   CommandCenterState,
   EventState,
+  DepartmentState,
   MaterialState,
   RouteRuleState,
   TaskState,
@@ -19,9 +20,89 @@ const agentDirectory = [
   { id: "dev-builder", name: "Dev Builder", department: "development" },
   { id: "dev-reviewer", name: "Dev Reviewer", department: "development" },
   { id: "qa-lead", name: "QA Lead", department: "quality-control" },
+  { id: "seo-strategist", name: "SEO Strategist", department: "marketing" },
+  { id: "marketing-researcher", name: "Marketing Researcher", department: "marketing" },
+  { id: "content-writer", name: "Content Writer", department: "marketing" },
+  { id: "ads-specialist", name: "Ads Specialist", department: "marketing" },
+  { id: "security-officer", name: "Security Officer", department: "security" },
   { id: "materials-librarian", name: "Materials Librarian", department: "materials-library" },
   { id: "daily-auditor", name: "Daily Auditor", department: "quality-control" },
 ] as const;
+
+const departmentDirectory: DepartmentState[] = [
+  {
+    id: "management",
+    name: "Управление",
+    mission: "Принимать задачи владельца, классифицировать запросы, запускать маршруты и возвращать понятный результат.",
+    lead: "owner-assistant",
+    responsibilities: ["единая точка входа", "маршрутизация", "приоритизация", "отчет владельцу"],
+    tools: ["Postgres tasks", "Hermes dispatcher", "Command Center"],
+    flows: ["owner_request", "route_selection", "handoff", "final_report"],
+    products: ["план задачи", "статус", "финальный отчет"],
+    agentIds: ["owner-assistant", "orchestrator"],
+    routeTypes: ["feature_development", "bugfix", "content_production", "ad_campaign", "security_review"],
+  },
+  {
+    id: "development",
+    name: "Разработка",
+    mission: "Делать изменения кода только через Codex CLI, проверки и ревью.",
+    lead: "dev-builder",
+    responsibilities: ["реализация", "bugfix", "детерминированные проверки", "code review"],
+    tools: ["tools/codex-cli/run-codex-task.sh", "tools/codex-cli/review-codex-task.sh", "tests/lint/build"],
+    flows: ["feature_development", "bugfix"],
+    products: ["patch", "review report", "build/test output"],
+    agentIds: ["dev-builder", "dev-reviewer"],
+    routeTypes: ["feature_development", "bugfix"],
+  },
+  {
+    id: "quality-control",
+    name: "Контроль качества",
+    mission: "Не выпускать владельцу непроверенные, сломанные или рискованные результаты.",
+    lead: "qa-lead",
+    responsibilities: ["acceptance gates", "browser/UI QA", "регрессия", "ежедневный аудит"],
+    tools: ["tools/universal-qa", "qc/acceptance-gates.yaml", "events/incidents"],
+    flows: ["qa_review", "daily_audit"],
+    products: ["qc_results", "release checklist", "daily audit"],
+    agentIds: ["qa-lead", "daily-auditor"],
+    routeTypes: ["qa_review", "daily_audit"],
+  },
+  {
+    id: "marketing",
+    name: "Маркетинг",
+    mission: "Производить доказательный контент, SEO-структуру, исследования и рекламные кампании под один проект.",
+    lead: "seo-strategist",
+    responsibilities: ["SEO brief", "research report", "content draft", "SEO review", "рекламные кампании и аналитика"],
+    tools: ["web research", "source ledger", "style guide", "Yandex Metrica", "Yandex Direct", "Yandex Webmaster"],
+    flows: ["content_production", "seo_brief", "marketing_research", "content_rewrite", "seo_review", "ad_campaign"],
+    products: ["SEO brief", "research report", "draft", "SEO review", "ad plan", "campaign report"],
+    agentIds: ["seo-strategist", "marketing-researcher", "content-writer", "ads-specialist"],
+    routeTypes: ["content_production", "seo_brief", "marketing_research", "content_rewrite", "seo_review", "ad_campaign"],
+  },
+  {
+    id: "security",
+    name: "Безопасность",
+    mission: "Проверять продукты, задачи, интеграции и артефакты на риски до запуска и публикации.",
+    lead: "security-officer",
+    responsibilities: ["threat modeling", "secret exposure", "dependency risk", "access control", "security acceptance"],
+    tools: ["security checklist", "dependency audit", "logs/events", "secret redaction"],
+    flows: ["security_review", "release_security_gate", "incident_review"],
+    products: ["risk assessment", "security findings", "go/no-go decision"],
+    agentIds: ["security-officer"],
+    routeTypes: ["security_review", "release_security_gate"],
+  },
+  {
+    id: "materials-library",
+    name: "Библиотека материалов",
+    mission: "Хранить только проверенные и переиспользуемые материалы проекта.",
+    lead: "materials-librarian",
+    responsibilities: ["версионирование", "каталогизация", "сохранение финальных материалов", "поиск знаний"],
+    tools: ["materials table", "artifacts", "memory"],
+    flows: ["material_save"],
+    products: ["verified material", "style guide", "source ledger", "reusable report"],
+    agentIds: ["materials-librarian"],
+    routeTypes: ["material_save"],
+  },
+];
 
 let pool: Pool | null = null;
 
@@ -64,6 +145,50 @@ const routeFlows: Record<string, RouteStep[]> = {
   daily_audit: [
     { title: "Анализ событий и инцидентов", assignedAgent: "daily-auditor" },
     { title: "Формирование улучшений", assignedAgent: "daily-auditor" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  content_production: [
+    { title: "Классификация контент-задачи", assignedAgent: "orchestrator" },
+    { title: "SEO brief и поисковый интент", assignedAgent: "seo-strategist" },
+    { title: "Research report и source ledger", assignedAgent: "marketing-researcher" },
+    { title: "Draft по brief + research", assignedAgent: "content-writer" },
+    { title: "SEO review и правки структуры", assignedAgent: "seo-strategist" },
+    { title: "Content QC", assignedAgent: "qa-lead" },
+    { title: "Сохранение reusable materials", assignedAgent: "materials-librarian" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  seo_brief: [
+    { title: "SEO brief: интент, структура, запросы", assignedAgent: "seo-strategist" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  marketing_research: [
+    { title: "Research report и source ledger", assignedAgent: "marketing-researcher" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  content_rewrite: [
+    { title: "Редактура текста по brief/style guide", assignedAgent: "content-writer" },
+    { title: "SEO review", assignedAgent: "seo-strategist" },
+    { title: "Content QC", assignedAgent: "qa-lead" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  seo_review: [
+    { title: "SEO review готового текста", assignedAgent: "seo-strategist" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  ad_campaign: [
+    { title: "Классификация рекламной задачи", assignedAgent: "orchestrator" },
+    { title: "Проверка цели, оффера и посадочной", assignedAgent: "ads-specialist" },
+    { title: "План кампании и метрик", assignedAgent: "ads-specialist" },
+    { title: "Настройка/проверка аналитики", assignedAgent: "ads-specialist" },
+    { title: "Security/privacy review", assignedAgent: "security-officer" },
+    { title: "QC рекламного запуска", assignedAgent: "qa-lead" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  security_review: [
+    { title: "Классификация security-scope", assignedAgent: "orchestrator" },
+    { title: "Threat model и checklist", assignedAgent: "security-officer" },
+    { title: "Проверка секретов, доступов и зависимостей", assignedAgent: "security-officer" },
+    { title: "Security decision", assignedAgent: "security-officer" },
     { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
   ],
 };
@@ -171,6 +296,7 @@ type HermesKanbanSnapshot = {
   assignee?: string | null;
   summary?: string | null;
   lastComment?: string | null;
+  result?: string | null;
 };
 
 function commandCenterStatusFromHermes(status: string) {
@@ -226,12 +352,20 @@ for task_id in ids:
         summary = task["last_failure_error"]
     elif task["result"]:
         summary = task["result"]
+    result = None
+    if comment and comment["body"]:
+        result = comment["body"]
+    elif task["result"]:
+        result = task["result"]
+    elif summary:
+        result = summary
     out[task_id] = {
         "id": task["id"],
         "status": task["status"],
         "assignee": task["assignee"],
         "summary": summary,
         "lastComment": comment["body"] if comment else None,
+        "result": result,
     }
 
 print(json.dumps(out, ensure_ascii=False))
@@ -251,12 +385,14 @@ async function syncHermesKanbanState() {
     hermes_id: string | null;
     hermes_status: string | null;
     hermes_summary: string | null;
+    hermes_result: string | null;
   }>(`
     SELECT id::text,
            status,
            metadata->>'hermes_kanban_task_id' AS hermes_id,
            metadata->>'hermes_status' AS hermes_status,
-           metadata->>'hermes_summary' AS hermes_summary
+           metadata->>'hermes_summary' AS hermes_summary,
+           metadata->>'hermes_result' AS hermes_result
     FROM tasks
     WHERE metadata ? 'hermes_kanban_task_id'
       AND status NOT IN ('archived', 'cancelled')
@@ -274,9 +410,11 @@ async function syncHermesKanbanState() {
 
     const nextStatus = commandCenterStatusFromHermes(snapshot.status);
     const summary = snapshot.summary?.slice(0, 2000) ?? null;
+    const result = snapshot.result?.slice(0, 12000) ?? summary;
     const changed = task.status !== nextStatus
       || task.hermes_status !== snapshot.status
-      || (task.hermes_summary ?? null) !== summary;
+      || (task.hermes_summary ?? null) !== summary
+      || (task.hermes_result ?? null) !== result;
 
     if (!changed) continue;
 
@@ -288,11 +426,11 @@ async function syncHermesKanbanState() {
           metadata = metadata || jsonb_build_object(
             'hermes_status', $4::text,
             'hermes_summary', $5::text,
-            'hermes_result', $5::text,
+            'hermes_result', $6::text,
             'hermes_synced_at', now()
           )
       WHERE id = $1::uuid
-    `, [task.id, nextStatus, snapshot.assignee ?? null, snapshot.status, summary]);
+    `, [task.id, nextStatus, snapshot.assignee ?? null, snapshot.status, summary, result]);
 
     if (nextStatus === "blocked") {
       await queryRows(`
@@ -301,7 +439,7 @@ async function syncHermesKanbanState() {
             completed_at = COALESCE(completed_at, now()),
             output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
         WHERE task_id = $1::uuid AND status = 'running'
-      `, [task.id, summary]);
+      `, [task.id, result ?? summary]);
 
       await queryRows(`
         UPDATE agent_runs
@@ -309,7 +447,7 @@ async function syncHermesKanbanState() {
             completed_at = COALESCE(completed_at, now()),
             error = COALESCE($2::text, 'Hermes Kanban blocked the task')
         WHERE task_id = $1::uuid AND status = 'running'
-      `, [task.id, summary]);
+      `, [task.id, result ?? summary]);
     }
 
     if (nextStatus === "done") {
@@ -319,7 +457,7 @@ async function syncHermesKanbanState() {
             completed_at = COALESCE(completed_at, now()),
             output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
         WHERE task_id = $1::uuid AND status = 'running'
-      `, [task.id, summary]);
+      `, [task.id, result ?? summary]);
 
       await queryRows(`
         UPDATE agent_runs
@@ -327,7 +465,7 @@ async function syncHermesKanbanState() {
             completed_at = COALESCE(completed_at, now()),
             output = COALESCE(output, '{}'::jsonb) || jsonb_build_object('hermes_summary', $2::text)
         WHERE task_id = $1::uuid AND status = 'running'
-      `, [task.id, summary]);
+      `, [task.id, result ?? summary]);
     }
 
     await queryRows(`
@@ -338,7 +476,7 @@ async function syncHermesKanbanState() {
         'command-center',
         CASE WHEN $2 = 'blocked' THEN 'warn' ELSE 'info' END,
         $3,
-        jsonb_build_object('hermes_task_id', $4::text, 'hermes_status', $5::text, 'summary', $6::text)
+        jsonb_build_object('hermes_task_id', $4::text, 'hermes_status', $5::text, 'summary', $6::text, 'result', $7::text)
       )
     `, [
       task.id,
@@ -347,6 +485,7 @@ async function syncHermesKanbanState() {
       task.hermes_id,
       snapshot.status,
       summary,
+      result,
     ]);
   }
 }
@@ -629,6 +768,7 @@ function fallbackState(agents: AgentState[], message: string): CommandCenterStat
       failedQc: 0,
     },
     agents,
+    departments: departmentDirectory,
     tasks: [],
     materials: [],
     events: [{
@@ -659,6 +799,7 @@ export async function loadCommandCenterState(): Promise<CommandCenterState> {
         failedQc: database.failedQc,
       },
       agents,
+      departments: departmentDirectory,
       ...database,
     };
   } catch (error) {

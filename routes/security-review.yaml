@@ -1,0 +1,16 @@
+route_type: security_review
+department: security
+primary_agent: security-officer
+owner_outcome: security risk assessment and go/no-go decision
+flow:
+  - step: scope
+    agent: security-officer
+  - step: threat_model
+    agent: security-officer
+  - step: findings
+    agent: security-officer
+  - step: mitigation_plan
+    agent: security-officer
+  - step: owner_report
+    agent: owner-assistant
+approval: by-risk

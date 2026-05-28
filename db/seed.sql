@@ -4,7 +4,15 @@ VALUES
   ('bugfix', 'Bug fix', 'development', 'dev-builder', true, false, '{"workflow":"workflows/bugfix.md","next":["dev-reviewer","qa-lead"]}'),
   ('qa_review', 'QA review', 'quality-control', 'qa-lead', true, false, '{"workflow":"workflows/qa-review.md","tools":["universal-qa"]}'),
   ('material_save', 'Material save', 'materials-library', 'materials-librarian', false, false, '{"workflow":"workflows/material-lifecycle.md"}'),
-  ('daily_audit', 'Daily audit', 'quality-control', 'daily-auditor', false, false, '{"workflow":"workflows/daily-audit.md"}')
+  ('daily_audit', 'Daily audit', 'quality-control', 'daily-auditor', false, false, '{"workflow":"workflows/daily-audit.md"}'),
+  ('content_production', 'Content production', 'marketing', 'seo-strategist', true, true, '{"workflow":"workflows/content-production.md","next":["marketing-researcher","content-writer","seo-strategist","qa-lead","materials-librarian"]}'),
+  ('seo_brief', 'SEO brief', 'marketing', 'seo-strategist', false, false, '{"workflow":"workflows/content-production.md"}'),
+  ('marketing_research', 'Marketing research', 'marketing', 'marketing-researcher', true, false, '{"workflow":"workflows/content-production.md"}'),
+  ('content_rewrite', 'Content rewrite', 'marketing', 'content-writer', true, false, '{"workflow":"workflows/content-production.md","next":["seo-strategist","qa-lead"]}'),
+  ('seo_review', 'SEO review', 'marketing', 'seo-strategist', false, false, '{"workflow":"workflows/content-production.md"}'),
+  ('ad_campaign', 'Ad campaign', 'marketing', 'ads-specialist', true, true, '{"workflow":"workflows/ad-campaign.md","tools":["yandex-metrica","yandex-direct","yandex-webmaster"],"next":["security-officer","qa-lead"]}'),
+  ('security_review', 'Security review', 'security', 'security-officer', true, false, '{"workflow":"workflows/security-review.md"}'),
+  ('release_security_gate', 'Release security gate', 'security', 'security-officer', true, true, '{"workflow":"workflows/security-review.md","next":["qa-lead"]}')
 ON CONFLICT (route_type) DO UPDATE
 SET name = EXCLUDED.name,
     department = EXCLUDED.department,

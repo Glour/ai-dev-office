@@ -8,10 +8,12 @@ import {
   FileTextIcon,
   LayoutDashboardIcon,
   LibraryIcon,
+  NetworkIcon,
   PlusIcon,
   RouteIcon,
   ShieldCheckIcon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { LiveTaskTable } from "@/components/dashboard/live-task-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,17 +38,18 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { loadCommandCenterState } from "./lib/office";
-import type { AgentState, EventState, MaterialState, RouteRuleState } from "./lib/types";
+import type { AgentState, DepartmentState, EventState, MaterialState, RouteRuleState } from "./lib/types";
 
 export const dynamic = "force-dynamic";
 
-type View = "overview" | "tasks" | "agents" | "materials" | "routes" | "events";
+type View = "overview" | "tasks" | "departments" | "agents" | "materials" | "routes" | "events";
 
 const basePath = process.env.NEXT_PUBLIC_COMMAND_CENTER_BASE_PATH ?? process.env.COMMAND_CENTER_BASE_PATH ?? "";
 
 const navItems: Array<{ view: View; label: string; description: string; icon: typeof ActivityIcon }> = [
   { view: "overview", label: "Обзор", description: "Пульс офиса", icon: LayoutDashboardIcon },
   { view: "tasks", label: "Задачи", description: "Очередь и статусы", icon: ClipboardListIcon },
+  { view: "departments", label: "Отделы", description: "Оргструктура и ответственность", icon: NetworkIcon },
   { view: "agents", label: "Агенты", description: "Runtime gateway", icon: BotIcon },
   { view: "materials", label: "Материалы", description: "База знаний", icon: LibraryIcon },
   { view: "routes", label: "Маршруты", description: "Процессы", icon: RouteIcon },
@@ -153,7 +156,7 @@ function Sidebar({ activeView }: { activeView: View }) {
         <Card size="sm" className="bg-background shadow-none">
           <CardHeader>
             <CardTitle className="text-sm">AI Dev Office</CardTitle>
-            <CardDescription>7 Hermes profiles</CardDescription>
+            <CardDescription>12 Hermes profiles</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -304,6 +307,8 @@ function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentS
           <option value="management">Management</option>
           <option value="development">Development</option>
           <option value="quality-control">Quality Control</option>
+          <option value="marketing">Marketing</option>
+          <option value="security">Security</option>
           <option value="materials-library">Materials Library</option>
         </select>
         <select aria-label="Агент" className={selectClass} defaultValue="dev-builder" name="assignedAgent">
@@ -368,6 +373,118 @@ function AgentTable({ agents }: { agents: AgentState[] }) {
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+function DepartmentsMap({
+  agents,
+  departments,
+  routes,
+}: {
+  agents: AgentState[];
+  departments: DepartmentState[];
+  routes: RouteRuleState[];
+}) {
+  return (
+    <div className="grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Оргструктура</CardTitle>
+          <CardDescription>Один центр под один проект: владелец ставит задачу, отделы выполняют, QC и Security контролируют выпуск.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr_1fr]">
+            <OrgNode title="Владелец" subtitle="ставит задачу и утверждает результат" />
+            <OrgNode title="Owner Assistant + Orchestrator" subtitle="точка входа, маршрутизация, статусы и handoff" strong />
+            <OrgNode title="Результат" subtitle="код, текст, отчет, артефакт или материал библиотеки" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {departments.map((department) => {
+          const departmentAgents = agents.filter((agent) => department.agentIds.includes(agent.id));
+          const departmentRoutes = routes.filter((route) => department.routeTypes.includes(route.routeType));
+          return (
+            <Card key={department.id}>
+              <CardHeader>
+                <CardTitle>{department.name}</CardTitle>
+                <CardDescription>{department.mission}</CardDescription>
+                <CardAction><Badge variant="outline">lead: {department.lead}</Badge></CardAction>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <DepartmentSection title="Агенты">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {departmentAgents.map((agent) => (
+                      <div className="flex items-center gap-2 rounded-lg border px-3 py-2" key={agent.id}>
+                        <span className={`size-2 rounded-full ${agent.status === "active" ? "bg-emerald-400" : "bg-muted-foreground/30"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{agent.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
+                        </div>
+                        <Badge className={toneClass(agent.status)} variant="outline">{label(agent.status)}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </DepartmentSection>
+
+                <DepartmentSection title="Ответственность">
+                  <ChipList items={department.responsibilities} />
+                </DepartmentSection>
+
+                <DepartmentSection title="Инструменты и навыки">
+                  <ChipList items={department.tools} />
+                </DepartmentSection>
+
+                <DepartmentSection title="Маршруты">
+                  <div className="grid gap-2">
+                    {departmentRoutes.map((route) => (
+                      <div className="rounded-lg border px-3 py-2" key={route.routeType}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">{route.name}</p>
+                          <Badge variant="outline">{route.primaryAgent}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{route.routeType} · {route.qcRequired ? "QC обязателен" : "без QC"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </DepartmentSection>
+
+                <DepartmentSection title="Выходные продукты">
+                  <ChipList items={department.products} />
+                </DepartmentSection>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function OrgNode({ strong, subtitle, title }: { strong?: boolean; subtitle: string; title: string }) {
+  return (
+    <div className={`rounded-xl border p-4 ${strong ? "bg-primary text-primary-foreground" : "bg-background"}`}>
+      <p className="font-semibold">{title}</p>
+      <p className={`mt-1 text-sm ${strong ? "text-primary-foreground/75" : "text-muted-foreground"}`}>{subtitle}</p>
+    </div>
+  );
+}
+
+function DepartmentSection({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function ChipList({ items }: { items: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => <Badge key={item} variant="secondary">{item}</Badge>)}
+    </div>
   );
 }
 
@@ -512,6 +629,10 @@ export default async function CommandCenterPage({
                 <CardContent><LiveTaskTable initialSelectedTaskId={selectedTaskId} initialState={state} /></CardContent>
               </Card>
             </>
+          ) : null}
+
+          {activeView === "departments" ? (
+            <DepartmentsMap agents={state.agents} departments={state.departments} routes={state.routes} />
           ) : null}
 
           {activeView === "agents" ? (

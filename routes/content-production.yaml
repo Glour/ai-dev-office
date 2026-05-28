@@ -1,0 +1,26 @@
+route_type: content_production
+department: marketing
+primary_agent: seo-strategist
+owner_outcome: research-backed content draft ready for approval
+flow:
+  - step: classify
+    agent: orchestrator
+  - step: seo_brief
+    agent: seo-strategist
+    output: artifacts/briefs/<slug>.md
+  - step: research
+    agent: marketing-researcher
+    output: artifacts/research/<slug>.md
+  - step: draft
+    agent: content-writer
+    output: artifacts/drafts/<slug>.md
+  - step: seo_review
+    agent: seo-strategist
+    output: artifacts/reports/<slug>-seo-review.md
+  - step: content_qc
+    agent: qa-lead
+  - step: reusable_materials
+    agent: materials-librarian
+  - step: owner_report
+    agent: owner-assistant
+approval: before-publication

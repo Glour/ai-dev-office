@@ -14,6 +14,12 @@ departments:
   - id: quality-control
     name: Quality Control Department
     mission: Prevent unverified, broken, risky, or low-quality results from reaching the owner.
+  - id: marketing
+    name: Marketing Department
+    mission: Produce SEO strategy, research-backed content, and advertising operations for one project.
+  - id: security
+    name: Security Department
+    mission: Review products, integrations, releases, and tasks for security and privacy risks.
   - id: materials-library
     name: Materials Library
     mission: Store verified results, artifacts, reports, decisions, and reusable materials.
@@ -33,6 +39,21 @@ agents:
     service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
   - id: qa-lead
     department: quality-control
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: seo-strategist
+    department: marketing
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: marketing-researcher
+    department: marketing
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: content-writer
+    department: marketing
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: ads-specialist
+    department: marketing
+    service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
+  - id: security-officer
+    department: security
     service_template: hermes/systemd/hermes-gateway-ai-dev-office@.service
   - id: materials-librarian
     department: materials-library
