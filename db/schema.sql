@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS route_rules (
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_request TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'planned', 'running', 'blocked', 'review', 'qc', 'done', 'archived', 'cancelled', 'failed')),
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'planned', 'running', 'blocked', 'review', 'qc', 'done', 'archived', 'cancelled', 'failed', 'rejected')),
   route_type TEXT NOT NULL REFERENCES route_rules(route_type),
   assigned_department TEXT NOT NULL,
   assigned_agent TEXT NOT NULL,

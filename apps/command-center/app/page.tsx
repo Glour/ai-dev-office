@@ -66,6 +66,7 @@ const statusLabels: Record<string, string> = {
   done: "готово",
   cancelled: "отменена",
   failed: "ошибка",
+  rejected: "отклонена",
   draft: "черновик",
   verified: "проверено",
   archived: "архив",
@@ -116,6 +117,7 @@ function toneClass(status: string) {
   if (["active", "done", "verified", "passed"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (["running", "qc", "review", "new", "planned"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
   if (["blocked", "failed", "inactive"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
+  if (status === "rejected") return "border-slate-200 bg-slate-50 text-slate-600";
   return "border-border bg-muted text-muted-foreground";
 }
 
@@ -580,7 +582,7 @@ export default async function CommandCenterPage({
   const activeView = viewFromSearch(params);
   const selectedTaskId = selectedTaskFromSearch(params);
   const state = await loadCommandCenterState();
-  const openTasks = state.tasks.filter((task) => !["done", "archived", "cancelled", "failed"].includes(task.status));
+  const openTasks = state.tasks.filter((task) => !["done", "archived", "cancelled", "failed", "rejected"].includes(task.status));
 
   return (
     <main className="flex min-h-svh bg-background">

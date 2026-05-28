@@ -202,6 +202,30 @@ function stepsForRoute(routeType: string, primaryAgent: string): RouteStep[] {
   ];
 }
 
+function rejectReasonForOwnerRequest(ownerRequest: string) {
+  const normalized = ownerRequest.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "Запрос отклонен: пустая формулировка. Опишите действие и ожидаемый результат.";
+  }
+
+  const hasLettersOrDigits = /[\p{L}\p{N}]/u.test(normalized);
+  if (!hasLettersOrDigits) {
+    return "Запрос отклонен: в нем нет осмысленного текста. Опишите действие и ожидаемый результат.";
+  }
+
+  const words = normalized.match(/[\p{L}\p{N}]+/gu) ?? [];
+  const hasActionContext = /https?:\/\/|\/[\w.-]+|#[\w-]+|@\w+|\d/u.test(normalized);
+  if (normalized.length <= 6 && words.length <= 1 && !hasActionContext) {
+    return "Запрос отклонен: слишком короткая или неосмысленная формулировка. Сформулируйте задачу, действие и ожидаемый результат.";
+  }
+
+  if (normalized.length < 12 && words.length < 2 && !hasActionContext) {
+    return "Запрос отклонен: недостаточно данных для маршрутизации. Сформулируйте задачу, действие и ожидаемый результат.";
+  }
+
+  return null;
+}
+
 async function createHermesKanbanTask(input: {
   taskId: string;
   title: string;
@@ -395,7 +419,7 @@ async function syncHermesKanbanState() {
            metadata->>'hermes_result' AS hermes_result
     FROM tasks
     WHERE metadata ? 'hermes_kanban_task_id'
-      AND status NOT IN ('archived', 'cancelled')
+      AND status NOT IN ('archived', 'cancelled', 'rejected')
     ORDER BY updated_at DESC
     LIMIT 60
   `);
@@ -794,7 +818,7 @@ export async function loadCommandCenterState(): Promise<CommandCenterState> {
       database: { connected: true, message: "Postgres подключен" },
       totals: {
         activeAgents: agents.filter((agent) => agent.status === "active").length,
-        openTasks: database.tasks.filter((task) => !["done", "archived", "cancelled", "failed"].includes(task.status)).length,
+        openTasks: database.tasks.filter((task) => !["done", "archived", "cancelled", "failed", "rejected"].includes(task.status)).length,
         materials: database.materials.length,
         failedQc: database.failedQc,
       },
@@ -838,6 +862,42 @@ export async function createTask(input: {
     };
     const steps = stepsForRoute(route.route_type, route.primary_agent);
     const firstStep = steps[0];
+    const rejectReason = rejectReasonForOwnerRequest(input.ownerRequest);
+
+    if (rejectReason) {
+      const rejectedTaskResult = await client.query<{ id: string }>(`
+        INSERT INTO tasks (owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level, metadata, completed_at)
+        VALUES (
+          $1,
+          'rejected',
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          jsonb_build_object(
+            'source', 'command-center',
+            'rejected_at', now(),
+            'reject_reason', $7::text,
+            'hermes_result', $7::text,
+            'workflow_step_count', 0
+          ),
+          now()
+        )
+        RETURNING id::text
+      `, [input.ownerRequest, route.route_type, route.department, route.primary_agent, input.priority, input.riskLevel, rejectReason]);
+
+      const taskId = rejectedTaskResult.rows[0]?.id;
+      if (!taskId) throw new Error("Rejected task was not created");
+
+      await client.query(`
+        INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+        VALUES ($1::uuid, 'task.rejected', 'command-center', 'info', 'Задача отклонена до запуска: неосмысленная или неполная формулировка', jsonb_build_object('reason', $2::text, 'route_type', $3::text))
+      `, [taskId, rejectReason, route.route_type]);
+
+      await client.query("COMMIT");
+      return { id: taskId };
+    }
 
     const taskResult = await client.query<{ id: string }>(`
       INSERT INTO tasks (owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level, metadata)
@@ -942,7 +1002,7 @@ export async function updateTaskStatus(input: {
   taskId: string;
   status: string;
 }) {
-  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "archived", "cancelled", "failed"]);
+  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "archived", "cancelled", "failed", "rejected"]);
   if (!allowed.has(input.status)) {
     throw new Error(`Unsupported task status: ${input.status}`);
   }

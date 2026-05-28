@@ -27,6 +27,7 @@ const statusLabels: Record<string, string> = {
   done: "готово",
   cancelled: "отменена",
   failed: "ошибка",
+  rejected: "отклонена",
   verified: "проверено",
   archived: "архив",
   low: "низкий",
@@ -56,6 +57,7 @@ function toneClass(status: string) {
   if (["done", "verified", "passed"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (["running", "qc", "review", "new", "planned"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
   if (["blocked", "failed"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
+  if (status === "rejected") return "border-slate-200 bg-slate-50 text-slate-600";
   return "border-border bg-muted text-muted-foreground";
 }
 
@@ -63,11 +65,13 @@ function statusIcon(status: string) {
   if (["running", "review", "qc"].includes(status)) return <Loader2Icon className="size-3 animate-spin" />;
   if (["done", "verified"].includes(status)) return <CheckCircle2Icon className="size-3" />;
   if (["blocked", "failed"].includes(status)) return <CircleDashedIcon className="size-3" />;
+  if (status === "rejected") return <XIcon className="size-3" />;
   return <Clock3Icon className="size-3" />;
 }
 
 function progressFor(task: TaskState) {
   if (["done", "verified"].includes(task.status)) return 100;
+  if (task.status === "rejected") return 0;
   if (task.stepCount === 0) return 0;
   const done = task.steps.filter((step) => ["done", "skipped"].includes(step.status)).length;
   const running = task.steps.some((step) => step.status === "running") ? 0.5 : 0;
@@ -76,16 +80,8 @@ function progressFor(task: TaskState) {
 
 function completedStepsFor(task: TaskState) {
   if (["done", "verified"].includes(task.status)) return task.stepCount;
+  if (task.status === "rejected") return 0;
   return task.steps.filter((step) => ["done", "skipped"].includes(step.status)).length;
-}
-
-function normalizeOutput(output?: string) {
-  if (!output || output === "{}") return "";
-  try {
-    return JSON.stringify(JSON.parse(output), null, 2);
-  } catch {
-    return output;
-  }
 }
 
 async function postTaskAction(taskId: string, action: "archive" | "delete") {
@@ -211,7 +207,7 @@ export function LiveTaskTable({
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                         <div
-                          className={`h-full rounded-full transition-all ${["blocked", "failed"].includes(task.status) ? "bg-red-400" : "bg-emerald-400"}`}
+                          className={`h-full rounded-full transition-all ${["blocked", "failed"].includes(task.status) ? "bg-red-400" : task.status === "rejected" ? "bg-slate-300" : "bg-emerald-400"}`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -320,7 +316,11 @@ function TaskDetailsModal({
             {task.result ? (
               <p className="whitespace-pre-wrap break-words text-sm leading-6">{task.result}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">Результат еще не записан. Когда агент завершит работу или заблокирует задачу, итог появится здесь.</p>
+              <p className="text-sm text-muted-foreground">
+                {task.status === "rejected"
+                  ? "Задача отклонена до запуска. Runtime не запускался."
+                  : "Результат еще не записан. Когда агент завершит работу или заблокирует задачу, итог появится здесь."}
+              </p>
             )}
           </DetailBlock>
 
@@ -334,14 +334,16 @@ function TaskDetailsModal({
                     <Badge className={toneClass(step.status)} variant="outline">{label(step.status)}</Badge>
                   </div>
                   <p className="mt-1 break-words text-xs text-muted-foreground">{step.assignedAgent ?? "агент не назначен"}{step.toolName ? ` · ${step.toolName}` : ""}</p>
-                  {normalizeOutput(step.output) ? (
-                    <pre className="mt-2 max-h-40 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-2 text-xs leading-5">
-                      {normalizeOutput(step.output)}
-                    </pre>
+                  {step.output && step.output !== "{}" ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Технический вывод скрыт; итог показан в блоке “Результат”.</p>
                   ) : null}
                 </div>
               ))}
-              {task.steps.length === 0 ? <p className="text-sm text-muted-foreground">Шаги еще не созданы.</p> : null}
+              {task.steps.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {task.status === "rejected" ? "Задача отклонена до запуска, шаги выполнения не создавались." : "Шаги еще не созданы."}
+                </p>
+              ) : null}
             </div>
           </DetailBlock>
 
