@@ -8,13 +8,14 @@ import {
   CheckCircle2Icon,
   CircleDashedIcon,
   Clock3Icon,
-  FileTextIcon,
   Loader2Icon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ArtifactGallery } from "@/components/dashboard/artifact-gallery";
+import { MarkdownView } from "@/components/dashboard/markdown-view";
 import type { CommandCenterState, TaskState } from "@/app/lib/types";
 
 const statusLabels: Record<string, string> = {
@@ -313,7 +314,7 @@ function TaskDetailsModal({
 
           <DetailBlock title="Результат">
             {task.result ? (
-              <p className="whitespace-pre-wrap break-words text-sm leading-6">{task.result}</p>
+              <MarkdownView value={task.result} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 {task.status === "rejected"
@@ -321,6 +322,10 @@ function TaskDetailsModal({
                   : "Результат еще не записан. Когда агент завершит работу или заблокирует задачу, итог появится здесь."}
               </p>
             )}
+          </DetailBlock>
+
+          <DetailBlock title="Артефакты">
+            <ArtifactGallery artifacts={task.artifacts} />
           </DetailBlock>
 
           <DetailBlock title="Шаги">
@@ -347,22 +352,6 @@ function TaskDetailsModal({
           </DetailBlock>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <DetailBlock title="Артефакты">
-              {task.artifacts.length > 0 ? (
-                <div className="grid gap-2">
-                  {task.artifacts.map((artifact) => (
-                    <a className="flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted" href={artifact.uri} key={artifact.id}>
-                      <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate font-medium">{artifact.title}</span>
-                      <span className="text-xs text-muted-foreground">{artifact.type}</span>
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Файлы, отчеты и документы по этой задаче пока не прикреплены.</p>
-              )}
-            </DetailBlock>
-
             <DetailBlock title="QC">
               {task.qcResults.length > 0 ? task.qcResults.map((result) => (
                 <div className="rounded-lg border px-3 py-2" key={result.id}>

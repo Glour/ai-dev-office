@@ -49,6 +49,8 @@ export type ArtifactState = {
   title: string;
   type: string;
   uri: string;
+  contentType?: string;
+  size?: number;
   createdAt: string;
 };
 

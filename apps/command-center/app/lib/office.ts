@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { promisify } from "node:util";
 import { Pool } from "pg";
 import type {
   AgentState,
+  ArtifactState,
   CapabilityState,
   CommandCenterState,
   EventState,
@@ -16,6 +18,7 @@ import type {
 import { encryptSecret, getSecretsKeyStatus } from "./secrets";
 
 const execFileAsync = promisify(execFile);
+const runtimeArtifactRoot = process.env.COMMAND_CENTER_ARTIFACT_DIR ?? "/root/home/ai-dev-office/artifacts";
 
 const agentDirectory = [
   { id: "owner-assistant", name: "Owner Assistant", department: "management" },
@@ -357,6 +360,93 @@ function hermesKanbanPath() {
   return `${hermesHome}/kanban.db`;
 }
 
+function contentTypeForArtifact(filePath: string) {
+  const ext = path.extname(filePath).toLowerCase();
+  if ([".png"].includes(ext)) return "image/png";
+  if ([".jpg", ".jpeg"].includes(ext)) return "image/jpeg";
+  if ([".gif"].includes(ext)) return "image/gif";
+  if ([".webp"].includes(ext)) return "image/webp";
+  if ([".avif"].includes(ext)) return "image/avif";
+  if ([".md", ".markdown"].includes(ext)) return "text/markdown";
+  if ([".json"].includes(ext)) return "application/json";
+  if ([".txt", ".log"].includes(ext)) return "text/plain";
+  if ([".pdf"].includes(ext)) return "application/pdf";
+  return "application/octet-stream";
+}
+
+function extractArtifactPaths(...values: Array<string | null | undefined>) {
+  const paths = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    const matches = value.match(/\/root\/home\/ai-dev-office\/artifacts\/[^\s`'")]+/g) ?? [];
+    for (const match of matches) {
+      paths.add(match.replace(/[.,;:]+$/g, ""));
+    }
+  }
+  return Array.from(paths);
+}
+
+async function walkArtifactPath(filePath: string, taskId: string, limit: number): Promise<ArtifactState[]> {
+  if (limit <= 0 || !filePath.startsWith(runtimeArtifactRoot)) return [];
+  try {
+    const info = await stat(filePath);
+    if (info.isFile()) {
+      return [{
+        id: `runtime-${taskId}-${Buffer.from(filePath).toString("base64url")}`,
+        title: path.basename(filePath),
+        type: "runtime_artifact",
+        uri: `/api/runtime-artifacts?path=${encodeURIComponent(filePath)}`,
+        contentType: contentTypeForArtifact(filePath),
+        size: info.size,
+        createdAt: info.mtime.toISOString(),
+      }];
+    }
+    if (!info.isDirectory()) return [];
+    const entries = await readdir(filePath, { withFileTypes: true });
+    const files: ArtifactState[] = [];
+    for (const entry of entries.sort((a, b) => Number(b.isFile()) - Number(a.isFile()) || a.name.localeCompare(b.name))) {
+      if (files.length >= limit) break;
+      const child = path.join(filePath, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...await walkArtifactPath(child, taskId, limit - files.length));
+      } else if (entry.isFile()) {
+        files.push(...await walkArtifactPath(child, taskId, limit - files.length));
+      }
+    }
+    return files;
+  } catch {
+    return [];
+  }
+}
+
+async function discoverRuntimeArtifacts(input: {
+  taskId: string;
+  hermesId?: string | null;
+  result?: string | null;
+  summary?: string | null;
+}) {
+  const candidates = new Set(extractArtifactPaths(input.result, input.summary));
+  if (input.hermesId) {
+    try {
+      const entries = await readdir(runtimeArtifactRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && entry.name.includes(input.hermesId)) {
+          candidates.add(path.join(runtimeArtifactRoot, entry.name));
+        }
+      }
+    } catch {
+      // Runtime artifacts are optional; the dashboard must stay available without them.
+    }
+  }
+
+  const artifacts: ArtifactState[] = [];
+  for (const candidate of candidates) {
+    artifacts.push(...await walkArtifactPath(candidate, input.taskId, 80 - artifacts.length));
+    if (artifacts.length >= 80) break;
+  }
+  return artifacts;
+}
+
 async function readHermesKanbanSnapshots(hermesIds: string[]): Promise<Record<string, HermesKanbanSnapshot>> {
   if (hermesIds.length === 0) return {};
 
@@ -611,12 +701,14 @@ async function loadDatabaseState() {
       running_step: string | null;
       hermes_status: string | null;
       hermes_summary: string | null;
+      hermes_kanban_task_id: string | null;
       result: string | null;
     }>(`
       SELECT id::text, owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level,
              created_at::text, updated_at::text,
              metadata->>'hermes_status' AS hermes_status,
              metadata->>'hermes_summary' AS hermes_summary,
+             metadata->>'hermes_kanban_task_id' AS hermes_kanban_task_id,
              metadata->>'hermes_result' AS result,
              (SELECT count(*)::text FROM task_steps WHERE task_steps.task_id = tasks.id) AS step_count,
              (SELECT title FROM task_steps WHERE task_steps.task_id = tasks.id AND task_steps.status = 'running' ORDER BY step_order LIMIT 1) AS running_step
@@ -647,9 +739,18 @@ async function loadDatabaseState() {
       artifact_type: string;
       title: string;
       uri: string;
+      content_type: string | null;
+      size: string | null;
       created_at: string;
     }>(`
-      SELECT id::text, task_id::text, artifact_type, title, uri, created_at::text
+      SELECT id::text,
+             task_id::text,
+             artifact_type,
+             title,
+             uri,
+             metadata->>'content_type' AS content_type,
+             metadata->>'size' AS size,
+             created_at::text
       FROM artifacts
       WHERE task_id IN (SELECT id FROM tasks ORDER BY updated_at DESC LIMIT 60)
       ORDER BY created_at DESC
@@ -750,10 +851,21 @@ async function loadDatabaseState() {
     queryRows<{ count: string }>("SELECT count(*)::text FROM qc_results WHERE status = 'failed'"),
   ]);
 
+  const discoveredArtifacts = new Map<string, ArtifactState[]>();
+  await Promise.all(tasks.map(async (task) => {
+    discoveredArtifacts.set(task.id, await discoverRuntimeArtifacts({
+      taskId: task.id,
+      hermesId: task.hermes_kanban_task_id,
+      result: task.result,
+      summary: task.hermes_summary,
+    }));
+  }));
+
   return {
     tasks: tasks.map<TaskState>((task, index) => {
       const steps = taskSteps.filter((step) => step.task_id === task.id);
       const artifacts = taskArtifacts.filter((artifact) => artifact.task_id === task.id);
+      const runtimeArtifacts = discoveredArtifacts.get(task.id) ?? [];
       const qcResults = taskQcResults.filter((result) => result.task_id === task.id);
       const taskEvents = events.filter((event) => event.task_id === task.id);
       return {
@@ -790,13 +902,15 @@ async function loadDatabaseState() {
           message: event.message,
           createdAt: event.created_at,
         })),
-        artifacts: artifacts.map((artifact) => ({
+        artifacts: (artifacts.map<ArtifactState>((artifact) => ({
           id: artifact.id,
           title: artifact.title,
           type: artifact.artifact_type,
           uri: artifact.uri,
+          contentType: artifact.content_type ?? undefined,
+          size: artifact.size ? Number(artifact.size) : undefined,
           createdAt: artifact.created_at,
-        })),
+        }))).concat(runtimeArtifacts),
         qcResults: qcResults.map((result) => ({
           id: result.id,
           status: result.status,

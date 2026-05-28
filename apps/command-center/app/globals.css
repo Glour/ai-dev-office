@@ -104,6 +104,7 @@ body {
     [data-slot="button"],
     [data-slot="table-row"],
     [data-slot="input"],
+    [data-slot="select"],
     [data-slot="textarea"],
     [data-slot="badge"] {
       transition-duration: 180ms;

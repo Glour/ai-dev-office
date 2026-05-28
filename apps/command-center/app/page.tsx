@@ -18,6 +18,7 @@ import {
 import { DepartmentsOrgChart } from "@/components/dashboard/departments-org-chart";
 import { FileDropzone } from "@/components/dashboard/file-dropzone";
 import { LiveTaskTable } from "@/components/dashboard/live-task-table";
+import { TaskForm } from "@/components/dashboard/task-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -307,54 +309,22 @@ function AgentSummary({ agents }: { agents: AgentState[] }) {
   );
 }
 
-function TaskForm({ routes, agents }: { routes: RouteRuleState[]; agents: AgentState[] }) {
-  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
-  const intakeRoute = routes.find((route) => route.routeType === "owner_request");
-  const ownerAgent = agents.find((agent) => agent.id === "owner-assistant");
-  return (
-    <form action={`${basePath}/api/tasks`} className="grid gap-3" encType="multipart/form-data" method="post">
-      <Textarea aria-label="Описание задачи" name="ownerRequest" placeholder="Сформулировать задачу для офиса..." required rows={5} />
-      <FileDropzone description="Файлы попадут в задачу как артефакты, а главный ассистент увидит их вместе с текстом." />
-      <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-        <input type="hidden" name="routeType" value="owner_request" />
-        <input type="hidden" name="assignedDepartment" value="management" />
-        <input type="hidden" name="assignedAgent" value="owner-assistant" />
-        <div className="flex min-h-8 flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 text-sm text-muted-foreground">
-          <span>Вход: {intakeRoute?.name ?? "Owner request intake"}</span>
-          <span>→</span>
-          <span>{ownerAgent?.name ?? "Owner Assistant"}</span>
-          <span>→ автоматическая маршрутизация</span>
-        </div>
-        <select aria-label="Приоритет" className={selectClass} defaultValue="normal" name="priority">
-          <option value="low">Низкий</option>
-          <option value="normal">Обычный</option>
-          <option value="high">Высокий</option>
-          <option value="urgent">Срочный</option>
-        </select>
-        <input type="hidden" name="riskLevel" value="medium" />
-        <Button type="submit"><PlusIcon className="size-4" />Создать</Button>
-      </div>
-    </form>
-  );
-}
-
 function MaterialForm() {
-  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
   return (
     <form action={`${basePath}/api/materials`} className="grid gap-3" encType="multipart/form-data" method="post">
       <div className="grid gap-2 md:grid-cols-2">
         <Input aria-label="Название материала" name="title" placeholder="Название материала или папки" />
         <Input aria-label="Ссылка или путь к файлу" name="storageUri" placeholder="Ссылка, если материал уже где-то лежит" />
-        <select aria-label="Тип материала" className={selectClass} defaultValue="instruction" name="materialType">
+        <SelectField aria-label="Тип материала" defaultValue="instruction" name="materialType">
           <option value="instruction">Инструкция</option>
           <option value="report">Отчет</option>
           <option value="brief">Бриф</option>
           <option value="document">Документ</option>
-        </select>
-        <select aria-label="Статус материала" className={selectClass} defaultValue="draft" name="status">
+        </SelectField>
+        <SelectField aria-label="Статус материала" defaultValue="draft" name="status">
           <option value="draft">Черновик</option>
           <option value="verified">Проверено</option>
-        </select>
+        </SelectField>
       </div>
       <FileDropzone description="Можно загрузить один или несколько файлов; каждый станет отдельным материалом библиотеки." />
       <Textarea aria-label="Краткое описание материала" name="sourceSummary" placeholder="Коротко: зачем этот материал нужен" rows={3} />
@@ -440,33 +410,32 @@ function CapabilityManager({ agents, capabilities }: { agents: AgentState[]; cap
 }
 
 function CapabilityForm({ agents, capability }: { agents: AgentState[]; capability?: CapabilityState }) {
-  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
   const departments = Array.from(new Set(agents.map((agent) => agent.department))).sort();
   return (
     <form action={`${basePath}/api/capabilities`} className="grid gap-3" method="post">
       <input name="id" type="hidden" value={capability?.id ?? ""} />
       <div className="grid gap-2 sm:grid-cols-2">
-        <select aria-label="Тип" className={selectClass} defaultValue={capability?.type ?? "skill"} name="capabilityType">
+        <SelectField aria-label="Тип" defaultValue={capability?.type ?? "skill"} name="capabilityType">
           <option value="skill">Скилл</option>
           <option value="tool">Инструмент</option>
-        </select>
-        <select aria-label="Статус" className={selectClass} defaultValue={capability?.status ?? "active"} name="status">
+        </SelectField>
+        <SelectField aria-label="Статус" defaultValue={capability?.status ?? "active"} name="status">
           <option value="active">Активен</option>
           <option value="draft">Черновик</option>
           <option value="disabled">Выключен</option>
-        </select>
+        </SelectField>
       </div>
       <Input aria-label="Название" defaultValue={capability?.name ?? ""} name="name" placeholder="Название" required />
       <Input aria-label="Slug" defaultValue={capability?.slug ?? ""} name="slug" placeholder="slug-название" required />
       <div className="grid gap-2 sm:grid-cols-2">
-        <select aria-label="Отдел" className={selectClass} defaultValue={capability?.scopeDepartment ?? ""} name="scopeDepartment">
+        <SelectField aria-label="Отдел" defaultValue={capability?.scopeDepartment ?? ""} name="scopeDepartment">
           <option value="">Весь офис</option>
           {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-        </select>
-        <select aria-label="Агент" className={selectClass} defaultValue={capability?.scopeAgent ?? ""} name="scopeAgent">
+        </SelectField>
+        <SelectField aria-label="Агент" defaultValue={capability?.scopeAgent ?? ""} name="scopeAgent">
           <option value="">Не ограничивать агентом</option>
           {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-        </select>
+        </SelectField>
       </div>
       <Textarea aria-label="Описание" defaultValue={capability?.description ?? ""} name="description" placeholder="Что это дает офису" rows={3} />
       <Textarea aria-label="Инструкции" defaultValue={capability?.instructions ?? ""} name="instructions" placeholder="Инструкции, правила использования, промпт или policy" rows={6} />
@@ -541,13 +510,12 @@ function SecretsVault({ agents, secrets }: { agents: AgentState[]; secrets: Secr
 }
 
 function SecretForm({ agents, disabled }: { agents: AgentState[]; disabled: boolean }) {
-  const selectClass = "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
   const departments = Array.from(new Set(agents.map((agent) => agent.department))).sort();
   return (
     <form action={`${basePath}/api/secrets`} className="grid gap-3" method="post">
       <fieldset className="grid gap-3" disabled={disabled}>
         <div className="grid gap-2 sm:grid-cols-2">
-          <select aria-label="Тип секрета" className={selectClass} defaultValue="generic" name="secretType">
+          <SelectField aria-label="Тип секрета" defaultValue="generic" name="secretType">
             <option value="generic">Generic</option>
             <option value="login">Login/password</option>
             <option value="api_key">API key</option>
@@ -555,23 +523,23 @@ function SecretForm({ agents, disabled }: { agents: AgentState[]; disabled: bool
             <option value="token">Token</option>
             <option value="cookie">Cookie</option>
             <option value="env">Env</option>
-          </select>
-          <select aria-label="Статус" className={selectClass} defaultValue="active" name="status">
+          </SelectField>
+          <SelectField aria-label="Статус" defaultValue="active" name="status">
             <option value="active">Активен</option>
             <option value="disabled">Выключен</option>
-          </select>
+          </SelectField>
         </div>
         <Input aria-label="Название секрета" name="name" placeholder="Название" required />
         <Input aria-label="Slug секрета" name="slug" placeholder="slug для secret://slug" required />
         <div className="grid gap-2 sm:grid-cols-2">
-          <select aria-label="Отдел" className={selectClass} defaultValue="" name="scopeDepartment">
+          <SelectField aria-label="Отдел" defaultValue="" name="scopeDepartment">
             <option value="">Весь офис</option>
             {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-          </select>
-          <select aria-label="Агент" className={selectClass} defaultValue="" name="scopeAgent">
+          </SelectField>
+          <SelectField aria-label="Агент" defaultValue="" name="scopeAgent">
             <option value="">Не ограничивать агентом</option>
             {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-          </select>
+          </SelectField>
         </div>
         <Textarea aria-label="Описание секрета" name="description" placeholder="Для чего нужен секрет и кто может использовать" rows={3} />
         <Textarea aria-label="Значение секрета" className="font-mono text-xs" name="secretValue" placeholder="Вставьте пароль, токен, SSH private key или JSON credentials" required rows={8} />
@@ -712,7 +680,7 @@ export default async function CommandCenterPage({
                   <CardTitle>Новая задача</CardTitle>
                   <CardDescription>Отправить запрос главному ассистенту: маршрут и исполнителей определит офис</CardDescription>
                 </CardHeader>
-                <CardContent><TaskForm routes={state.routes} agents={state.agents} /></CardContent>
+                <CardContent><TaskForm action={`${basePath}/api/tasks`} /></CardContent>
               </Card>
               <Card>
                 <CardHeader>
