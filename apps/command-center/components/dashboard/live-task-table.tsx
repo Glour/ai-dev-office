@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArchiveIcon,
   CheckCircle2Icon,
@@ -108,6 +109,7 @@ export function LiveTaskTable({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId ?? null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const tasks = useMemo(() => {
     const visible = state.tasks.filter((task) => !["archived", "cancelled"].includes(task.status));
@@ -151,6 +153,10 @@ export function LiveTaskTable({
   useEffect(() => {
     if (initialSelectedTaskId) setSelectedTaskId(initialSelectedTaskId);
   }, [initialSelectedTaskId]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <>
@@ -253,14 +259,15 @@ export function LiveTaskTable({
         </div>
       </div>
 
-      {selectedTask ? (
-        <TaskDetailsModal
-          onArchive={() => void runAction(selectedTask.id, "archive")}
-          onClose={() => setSelectedTaskId(null)}
-          onDelete={() => void runAction(selectedTask.id, "delete")}
-          task={selectedTask}
-        />
-      ) : null}
+      {mounted && selectedTask ? createPortal(
+          <TaskDetailsModal
+            onArchive={() => void runAction(selectedTask.id, "archive")}
+            onClose={() => setSelectedTaskId(null)}
+            onDelete={() => void runAction(selectedTask.id, "delete")}
+            task={selectedTask}
+          />,
+          document.body
+        ) : null}
     </>
   );
 }
