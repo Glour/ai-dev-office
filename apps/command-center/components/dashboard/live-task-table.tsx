@@ -73,6 +73,11 @@ function progressFor(task: TaskState) {
   return Math.min(96, Math.round(((done + running) / task.stepCount) * 100));
 }
 
+function completedStepsFor(task: TaskState) {
+  if (["done", "verified"].includes(task.status)) return task.stepCount;
+  return task.steps.filter((step) => ["done", "skipped"].includes(step.status)).length;
+}
+
 function normalizeOutput(output?: string) {
   if (!output || output === "{}") return "";
   try {
@@ -192,7 +197,7 @@ export function LiveTaskTable({ initialState, limit }: { initialState: CommandCe
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{task.steps.filter((step) => step.status === "done").length}/{task.stepCount} шагов</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{completedStepsFor(task)}/{task.stepCount} шагов</p>
                     </td>
                     <td className="px-4 py-4 align-top text-muted-foreground">{task.routeType}</td>
                     <td className="px-4 py-4 align-top text-muted-foreground">{task.agent}</td>
