@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { ArchiveIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -195,7 +196,7 @@ export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
           );
         })}
       </div>
-      {dragState ? (
+      {dragState ? createPortal(
         <div
           className="pointer-events-none fixed z-[1000]"
           data-drag-overlay
@@ -208,7 +209,8 @@ export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
           }}
         >
           <TaskCard dragging task={dragState.task} />
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );
