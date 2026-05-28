@@ -82,6 +82,12 @@ function viewFromSearch(searchParams?: Record<string, string | string[] | undefi
   return navItems.some((item) => item.view === value) ? value as View : "overview";
 }
 
+function selectedTaskFromSearch(searchParams?: Record<string, string | string[] | undefined>) {
+  const raw = searchParams?.task;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function viewHref(view: View) {
   return `${basePath || ""}/?view=${view}`;
 }
@@ -455,6 +461,7 @@ export default async function CommandCenterPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const activeView = viewFromSearch(params);
+  const selectedTaskId = selectedTaskFromSearch(params);
   const state = await loadCommandCenterState();
   const openTasks = state.tasks.filter((task) => !["done", "archived", "cancelled", "failed"].includes(task.status));
 
@@ -482,7 +489,7 @@ export default async function CommandCenterPage({
                     </Button>
                   </CardAction>
                 </CardHeader>
-                <CardContent><LiveTaskTable initialState={state} limit={12} /></CardContent>
+                <CardContent><LiveTaskTable initialSelectedTaskId={selectedTaskId} initialState={state} limit={12} /></CardContent>
               </Card>
               <AgentSummary agents={state.agents} />
             </>
@@ -502,7 +509,7 @@ export default async function CommandCenterPage({
                   <CardTitle>Задачи</CardTitle>
                   <CardDescription>Live-список без канбана: клик по строке открывает карточку задачи</CardDescription>
                 </CardHeader>
-                <CardContent><LiveTaskTable initialState={state} /></CardContent>
+                <CardContent><LiveTaskTable initialSelectedTaskId={selectedTaskId} initialState={state} /></CardContent>
               </Card>
             </>
           ) : null}

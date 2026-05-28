@@ -95,9 +95,17 @@ async function postTaskAction(taskId: string, action: "archive" | "delete") {
   await fetch("/api/tasks/action", { method: "POST", body: form });
 }
 
-export function LiveTaskTable({ initialState, limit }: { initialState: CommandCenterState; limit?: number }) {
+export function LiveTaskTable({
+  initialSelectedTaskId,
+  initialState,
+  limit,
+}: {
+  initialSelectedTaskId?: string;
+  initialState: CommandCenterState;
+  limit?: number;
+}) {
   const [state, setState] = useState(initialState);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialSelectedTaskId ?? null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionTaskId, setActionTaskId] = useState<string | null>(null);
 
@@ -139,6 +147,10 @@ export function LiveTaskTable({ initialState, limit }: { initialState: CommandCe
   useEffect(() => {
     setState(initialState);
   }, [initialState]);
+
+  useEffect(() => {
+    if (initialSelectedTaskId) setSelectedTaskId(initialSelectedTaskId);
+  }, [initialSelectedTaskId]);
 
   return (
     <>
