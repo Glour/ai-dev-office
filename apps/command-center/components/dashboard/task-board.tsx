@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragEndEvent,
-  DragOverlay,
   DragStartEvent,
   PointerSensor,
   useDroppable,
@@ -84,11 +83,6 @@ export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
 
-  const activeTask = useMemo(
-    () => tasks.find((task) => task.id === activeTaskId) ?? null,
-    [activeTaskId, tasks]
-  );
-
   async function handleDragEnd(event: DragEndEvent) {
     const taskId = String(event.active.id);
     const column = boardColumns.find((item) => item.id === event.over?.id);
@@ -135,6 +129,7 @@ export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
             const columnTasks = boardTasks.filter((task) => column.states.includes(task.status));
             return (
               <KanbanColumn
+                activeTaskId={activeTaskId}
                 column={column}
                 key={column.id}
                 pendingTaskId={pendingTaskId}
@@ -144,18 +139,17 @@ export function TaskBoard({ tasks }: { tasks: TaskState[] }) {
           })}
         </div>
       </div>
-      <DragOverlay>
-        {activeTask ? <TaskCard dragging task={activeTask} /> : null}
-      </DragOverlay>
     </DndContext>
   );
 }
 
 function KanbanColumn({
+  activeTaskId,
   column,
   tasks,
   pendingTaskId,
 }: {
+  activeTaskId: string | null;
   column: typeof boardColumns[number];
   tasks: TaskState[];
   pendingTaskId: string | null;
@@ -169,10 +163,10 @@ function KanbanColumn({
       id={`column-${column.id}`}
       ref={setNodeRef}
     >
-      <Card size="sm" className="mb-2 shadow-none">
-        <CardHeader>
+      <Card size="sm" className="mb-2 h-28 shadow-none">
+        <CardHeader className="h-full">
           <CardTitle>{column.title}</CardTitle>
-          <CardDescription>{column.hint}</CardDescription>
+          <CardDescription className="line-clamp-2">{column.hint}</CardDescription>
           <CardAction>
             <Badge variant="outline">{tasks.length}</Badge>
           </CardAction>
@@ -188,7 +182,7 @@ function KanbanColumn({
         ) : null}
         <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <DraggableTaskCard disabled={pendingTaskId === task.id} key={task.id} task={task} />
+            <DraggableTaskCard dragging={activeTaskId === task.id} disabled={pendingTaskId === task.id} key={task.id} task={task} />
           ))}
         </SortableContext>
       </div>
@@ -196,7 +190,7 @@ function KanbanColumn({
   );
 }
 
-function DraggableTaskCard({ disabled, task }: { disabled?: boolean; task: TaskState }) {
+function DraggableTaskCard({ disabled, dragging, task }: { disabled?: boolean; dragging?: boolean; task: TaskState }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     disabled,
@@ -213,16 +207,16 @@ function DraggableTaskCard({ disabled, task }: { disabled?: boolean; task: TaskS
       style={style}
       {...listeners}
       {...attributes}
-      className={`cursor-grab touch-none active:cursor-grabbing ${isDragging ? "opacity-40" : ""}`}
+      className={`cursor-grab touch-none active:cursor-grabbing ${isDragging ? "relative z-50 opacity-95" : ""}`}
     >
-      <TaskCard pending={disabled} task={task} />
+      <TaskCard dragging={dragging || isDragging} pending={disabled} task={task} />
     </div>
   );
 }
 
 function TaskCard({ dragging, pending, task }: { dragging?: boolean; pending?: boolean; task: TaskState }) {
   return (
-    <Card size="sm" className={`shadow-xs ${dragging ? "w-[270px] shadow-lg" : ""}`}>
+    <Card size="sm" className={`shadow-xs ${dragging ? "shadow-lg ring-1 ring-foreground/10" : ""}`}>
       <CardHeader>
         <CardDescription className="flex items-center justify-between gap-2">
           <Badge className={toneClass(task.status)} variant="outline">{pending ? "обновление" : label(task.status)}</Badge>
