@@ -11,6 +11,7 @@ import {
   PlusIcon,
   RouteIcon,
   ShieldCheckIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { TaskBoard } from "@/components/dashboard/task-board";
 import { Badge } from "@/components/ui/badge";
@@ -339,16 +340,43 @@ function MaterialForm() {
   );
 }
 
-function TaskTable({ tasks }: { tasks: TaskState[] }) {
+function TaskActionForms({ task, redirect = "/?view=tasks" }: { task: TaskState; redirect?: string }) {
+  return (
+    <div className="flex justify-end gap-1">
+      {task.status !== "archived" ? (
+        <form action={`${basePath}/api/tasks/action`} method="post">
+          <input name="taskId" type="hidden" value={task.id} />
+          <input name="action" type="hidden" value="archive" />
+          <input name="redirect" type="hidden" value={redirect} />
+          <Button aria-label="Архивировать задачу" size="icon" title="Архивировать" type="submit" variant="ghost">
+            <ArchiveIcon className="size-4" />
+          </Button>
+        </form>
+      ) : null}
+      <form action={`${basePath}/api/tasks/action`} method="post">
+        <input name="taskId" type="hidden" value={task.id} />
+        <input name="action" type="hidden" value="delete" />
+        <input name="redirect" type="hidden" value={redirect} />
+        <Button aria-label="Удалить задачу" size="icon" title="Удалить" type="submit" variant="ghost">
+          <Trash2Icon className="size-4" />
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function TaskTable({ tasks, redirect = "/?view=tasks" }: { tasks: TaskState[]; redirect?: string }) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Задача</TableHead>
           <TableHead>Статус</TableHead>
+          <TableHead>Текущий шаг</TableHead>
           <TableHead>Маршрут</TableHead>
           <TableHead>Агент</TableHead>
           <TableHead>Обновлена</TableHead>
+          <TableHead className="text-right">Действия</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -361,12 +389,19 @@ function TaskTable({ tasks }: { tasks: TaskState[] }) {
               </div>
             </TableCell>
             <TableCell><Badge className={toneClass(task.status)} variant="outline">{label(task.status)}</Badge></TableCell>
+            <TableCell>
+              <div className="max-w-48">
+                <p className="line-clamp-1">{task.runningStep ?? "нет активного шага"}</p>
+                <p className="text-xs text-muted-foreground">{task.stepCount} шагов</p>
+              </div>
+            </TableCell>
             <TableCell>{task.routeType}</TableCell>
             <TableCell>{task.agent}</TableCell>
             <TableCell>{formatDate(task.updatedAt)}</TableCell>
+            <TableCell><TaskActionForms redirect={redirect} task={task} /></TableCell>
           </TableRow>
         ))}
-        {tasks.length === 0 ? <TableRow><TableCell colSpan={5}>Задач пока нет.</TableCell></TableRow> : null}
+        {tasks.length === 0 ? <TableRow><TableCell colSpan={7}>Задач пока нет.</TableCell></TableRow> : null}
       </TableBody>
     </Table>
   );
@@ -488,7 +523,7 @@ export default async function CommandCenterPage({
   const params = searchParams ? await searchParams : {};
   const activeView = viewFromSearch(params);
   const state = await loadCommandCenterState();
-  const openTasks = state.tasks.filter((task) => !["done", "cancelled", "failed"].includes(task.status));
+  const openTasks = state.tasks.filter((task) => !["done", "archived", "cancelled", "failed"].includes(task.status));
 
   return (
     <main className="flex min-h-svh bg-background">
@@ -514,7 +549,7 @@ export default async function CommandCenterPage({
                     </Button>
                   </CardAction>
                 </CardHeader>
-                <CardContent><TaskTable tasks={state.tasks.slice(0, 12)} /></CardContent>
+                <CardContent><TaskTable redirect="/?view=overview" tasks={state.tasks.slice(0, 12)} /></CardContent>
               </Card>
               <AgentSummary agents={state.agents} />
             </>
@@ -525,7 +560,7 @@ export default async function CommandCenterPage({
               <Card>
                 <CardHeader>
                   <CardTitle>Новая задача</CardTitle>
-                  <CardDescription>Создать запись в очереди офиса</CardDescription>
+                  <CardDescription>Создать задачу, построить маршрут и запустить первый шаг</CardDescription>
                 </CardHeader>
                 <CardContent><TaskForm routes={state.routes} agents={state.agents} /></CardContent>
               </Card>

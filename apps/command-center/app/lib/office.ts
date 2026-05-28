@@ -25,6 +25,56 @@ const agentDirectory = [
 
 let pool: Pool | null = null;
 
+type RouteStep = {
+  title: string;
+  assignedAgent: string;
+  toolName?: string;
+};
+
+const routeFlows: Record<string, RouteStep[]> = {
+  feature_development: [
+    { title: "Классификация запроса и постановка маршрута", assignedAgent: "orchestrator" },
+    { title: "Реализация через Codex CLI", assignedAgent: "dev-builder", toolName: "tools/codex-cli/run-codex-task.sh" },
+    { title: "Детерминированные проверки", assignedAgent: "dev-builder" },
+    { title: "Code review через Codex CLI", assignedAgent: "dev-reviewer", toolName: "tools/codex-cli/review-codex-task.sh" },
+    { title: "Финальный QC", assignedAgent: "qa-lead", toolName: "tools/universal-qa" },
+    { title: "Сохранение материалов", assignedAgent: "materials-librarian" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  bugfix: [
+    { title: "Классификация бага и маршрута", assignedAgent: "orchestrator" },
+    { title: "Исправление через Codex CLI", assignedAgent: "dev-builder", toolName: "tools/codex-cli/run-codex-task.sh" },
+    { title: "Регрессионные проверки", assignedAgent: "dev-builder" },
+    { title: "Review исправления", assignedAgent: "dev-reviewer", toolName: "tools/codex-cli/review-codex-task.sh" },
+    { title: "QC решение", assignedAgent: "qa-lead", toolName: "tools/universal-qa" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  qa_review: [
+    { title: "Выбор проверок", assignedAgent: "qa-lead" },
+    { title: "Запуск Universal QA", assignedAgent: "qa-lead", toolName: "tools/universal-qa" },
+    { title: "QC решение", assignedAgent: "qa-lead" },
+  ],
+  material_save: [
+    { title: "Проверка материала", assignedAgent: "materials-librarian" },
+    { title: "Версионирование и сохранение", assignedAgent: "materials-librarian" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+  daily_audit: [
+    { title: "Анализ событий и инцидентов", assignedAgent: "daily-auditor" },
+    { title: "Формирование улучшений", assignedAgent: "daily-auditor" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ],
+};
+
+function stepsForRoute(routeType: string, primaryAgent: string): RouteStep[] {
+  return routeFlows[routeType] ?? [
+    { title: "Классификация и запуск задачи", assignedAgent: "orchestrator" },
+    { title: "Выполнение основного шага", assignedAgent: primaryAgent },
+    { title: "Контроль результата", assignedAgent: "qa-lead" },
+    { title: "Отчет владельцу", assignedAgent: "owner-assistant" },
+  ];
+}
+
 function databaseUrl() {
   return process.env.DATABASE_URL
     ?? `postgres://${process.env.POSTGRES_USER ?? "ai_dev_office"}:${process.env.POSTGRES_PASSWORD ?? "change-me"}@${process.env.POSTGRES_HOST ?? "127.0.0.1"}:${process.env.POSTGRES_PORT ?? "5432"}/${process.env.POSTGRES_DB ?? "ai_dev_office"}`;
@@ -112,9 +162,13 @@ async function loadDatabaseState() {
       risk_level: string;
       created_at: string;
       updated_at: string;
+      step_count: string;
+      running_step: string | null;
     }>(`
       SELECT id::text, owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level,
-             created_at::text, updated_at::text
+             created_at::text, updated_at::text,
+             (SELECT count(*)::text FROM task_steps WHERE task_steps.task_id = tasks.id) AS step_count,
+             (SELECT title FROM task_steps WHERE task_steps.task_id = tasks.id AND task_steps.status = 'running' ORDER BY step_order LIMIT 1) AS running_step
       FROM tasks
       ORDER BY updated_at DESC
       LIMIT 60
@@ -174,6 +228,8 @@ async function loadDatabaseState() {
       agent: task.assigned_agent,
       priority: task.priority,
       riskLevel: task.risk_level,
+      stepCount: Number(task.step_count ?? 0),
+      runningStep: task.running_step ?? undefined,
       createdAt: task.created_at,
       updatedAt: task.updated_at,
     })),
@@ -247,7 +303,7 @@ export async function loadCommandCenterState(): Promise<CommandCenterState> {
       database: { connected: true, message: "Postgres подключен" },
       totals: {
         activeAgents: agents.filter((agent) => agent.status === "active").length,
-        openTasks: database.tasks.filter((task) => !["done", "cancelled", "failed"].includes(task.status)).length,
+        openTasks: database.tasks.filter((task) => !["done", "archived", "cancelled", "failed"].includes(task.status)).length,
         materials: database.materials.length,
         failedQc: database.failedQc,
       },
@@ -268,25 +324,103 @@ export async function createTask(input: {
   priority: string;
   riskLevel: string;
 }) {
-  const rows = await queryRows<{ id: string }>(`
-    INSERT INTO tasks (owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level, metadata)
-    VALUES ($1, 'new', $2, $3, $4, $5, $6, '{"source":"command-center"}'::jsonb)
-    RETURNING id::text
-  `, [input.ownerRequest, input.routeType, input.assignedDepartment, input.assignedAgent, input.priority, input.riskLevel]);
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
 
-  await queryRows(`
-    INSERT INTO events (task_id, event_type, actor, severity, message)
-    VALUES ($1::uuid, 'task.created', 'command-center', 'info', 'Задача создана через Command Center')
-  `, [rows[0]?.id]);
+    const routeResult = await client.query<{
+      route_type: string;
+      department: string;
+      primary_agent: string;
+    }>(`
+      SELECT route_type, department, primary_agent
+      FROM route_rules
+      WHERE route_type = $1 AND status = 'active'
+      LIMIT 1
+    `, [input.routeType]);
 
-  return rows[0];
+    const route = routeResult.rows[0] ?? {
+      route_type: input.routeType,
+      department: input.assignedDepartment,
+      primary_agent: input.assignedAgent,
+    };
+    const steps = stepsForRoute(route.route_type, route.primary_agent);
+    const firstStep = steps[0];
+
+    const taskResult = await client.query<{ id: string }>(`
+      INSERT INTO tasks (owner_request, status, route_type, assigned_department, assigned_agent, priority, risk_level, metadata)
+      VALUES (
+        $1,
+        'running',
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        jsonb_build_object('source', 'command-center', 'workflow_started_at', now(), 'workflow_step_count', $7::int)
+      )
+      RETURNING id::text
+    `, [input.ownerRequest, route.route_type, route.department, route.primary_agent, input.priority, input.riskLevel, steps.length]);
+
+    const taskId = taskResult.rows[0]?.id;
+    if (!taskId) throw new Error("Task was not created");
+
+    let firstStepId = "";
+    for (const [index, step] of steps.entries()) {
+      const stepResult = await client.query<{ id: string }>(`
+        INSERT INTO task_steps (task_id, step_order, title, status, assigned_agent, tool_name, input, started_at)
+        VALUES (
+          $1::uuid,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          jsonb_build_object('owner_request', $7::text, 'route_type', $8::text),
+          CASE WHEN $4 = 'running' THEN now() ELSE NULL END
+        )
+        RETURNING id::text
+      `, [
+        taskId,
+        index + 1,
+        step.title,
+        index === 0 ? "running" : "pending",
+        step.assignedAgent,
+        step.toolName ?? null,
+        input.ownerRequest,
+        route.route_type,
+      ]);
+      if (index === 0) firstStepId = stepResult.rows[0]?.id ?? "";
+    }
+
+    await client.query(`
+      INSERT INTO agent_runs (task_id, step_id, agent_id, tool_name, status, input)
+      VALUES ($1::uuid, $2::uuid, $3, $4, 'running', jsonb_build_object('owner_request', $5::text, 'route_type', $6::text))
+    `, [taskId, firstStepId, firstStep?.assignedAgent ?? route.primary_agent, firstStep?.toolName ?? "hermes-profile", input.ownerRequest, route.route_type]);
+
+    await client.query(`
+      INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+      VALUES
+        ($1::uuid, 'task.created', 'command-center', 'info', 'Задача создана через Command Center', jsonb_build_object('route_type', $2::text)),
+        ($1::uuid, 'workflow.started', 'orchestrator', 'info', 'Маршрут запущен: создана цепочка шагов и первый agent_run', jsonb_build_object('first_agent', $3::text, 'steps', $4::int)),
+        ($1::uuid, 'task.assigned', $3::text, 'info', 'Первый шаг передан ответственному агенту', jsonb_build_object('step_title', $5::text))
+    `, [taskId, route.route_type, firstStep?.assignedAgent ?? route.primary_agent, steps.length, firstStep?.title ?? "Запуск"]);
+
+    await client.query("COMMIT");
+    return { id: taskId };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateTaskStatus(input: {
   taskId: string;
   status: string;
 }) {
-  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "cancelled", "failed"]);
+  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "archived", "cancelled", "failed"]);
   if (!allowed.has(input.status)) {
     throw new Error(`Unsupported task status: ${input.status}`);
   }
@@ -307,6 +441,46 @@ export async function updateTaskStatus(input: {
     VALUES ($1::uuid, 'task.status.changed', 'command-center', 'info', 'Статус задачи изменен на доске', jsonb_build_object('status', $2::text))
   `, [input.taskId, input.status]);
 
+  return rows[0];
+}
+
+export async function archiveTask(taskId: string) {
+  const rows = await queryRows<{ id: string }>(`
+    UPDATE tasks
+    SET status = 'archived', updated_at = now(), metadata = metadata || jsonb_build_object('archived_at', now(), 'archived_by', 'command-center')
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [taskId]);
+
+  if (!rows[0]) throw new Error("Task not found");
+
+  await queryRows(`
+    UPDATE agent_runs
+    SET status = 'cancelled', completed_at = now(), error = 'Task archived from Command Center'
+    WHERE task_id = $1::uuid AND status = 'running'
+  `, [taskId]);
+
+  await queryRows(`
+    INSERT INTO events (task_id, event_type, actor, severity, message)
+    VALUES ($1::uuid, 'task.archived', 'command-center', 'info', 'Задача отправлена в архив')
+  `, [taskId]);
+
+  return rows[0];
+}
+
+export async function deleteTask(taskId: string) {
+  await queryRows(`
+    INSERT INTO events (task_id, event_type, actor, severity, message)
+    VALUES ($1::uuid, 'task.delete.requested', 'command-center', 'warn', 'Задача удалена из Command Center')
+  `, [taskId]);
+
+  const rows = await queryRows<{ id: string }>(`
+    DELETE FROM tasks
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [taskId]);
+
+  if (!rows[0]) throw new Error("Task not found");
   return rows[0];
 }
 

@@ -20,6 +20,8 @@ export type TaskState = {
   agent: string;
   priority: string;
   riskLevel: string;
+  stepCount: number;
+  runningStep?: string;
   createdAt: string;
   updatedAt: string;
 };
