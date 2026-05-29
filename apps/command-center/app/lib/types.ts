@@ -69,6 +69,8 @@ export type MaterialState = {
   status: string;
   version: number;
   storageUri: string;
+  publicUri?: string;
+  contentType?: string;
   sourceSummary?: string;
   updatedAt: string;
 };

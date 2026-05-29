@@ -18,6 +18,7 @@ import {
 import { DepartmentsOrgChart } from "@/components/dashboard/departments-org-chart";
 import { FileDropzone } from "@/components/dashboard/file-dropzone";
 import { LiveTaskTable } from "@/components/dashboard/live-task-table";
+import { MaterialLibrary } from "@/components/dashboard/material-library";
 import { TaskForm } from "@/components/dashboard/task-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { loadCommandCenterState, secretsVaultStatus } from "./lib/office";
-import type { AgentState, CapabilityState, EventState, MaterialState, RouteRuleState, SecretState } from "./lib/types";
+import type { AgentState, CapabilityState, EventState, RouteRuleState, SecretState } from "./lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -550,35 +551,6 @@ function SecretForm({ agents, disabled }: { agents: AgentState[]; disabled: bool
   );
 }
 
-function MaterialTable({ materials }: { materials: MaterialState[] }) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Материал</TableHead>
-          <TableHead>Тип</TableHead>
-          <TableHead>Статус</TableHead>
-          <TableHead>Хранилище</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {materials.map((material) => (
-          <TableRow key={material.id}>
-            <TableCell>
-              <p className="font-medium">{material.title}</p>
-              <p className="text-muted-foreground">v{material.version} · {formatDate(material.updatedAt)}</p>
-            </TableCell>
-            <TableCell>{label(material.type)}</TableCell>
-            <TableCell><Badge className={toneClass(material.status)} variant="outline">{label(material.status)}</Badge></TableCell>
-            <TableCell>{material.storageUri}</TableCell>
-          </TableRow>
-        ))}
-        {materials.length === 0 ? <TableRow><TableCell colSpan={4}>Библиотека пока пустая.</TableCell></TableRow> : null}
-      </TableBody>
-    </Table>
-  );
-}
-
 function RouteTable({ routes }: { routes: RouteRuleState[] }) {
   return (
     <Table>
@@ -725,7 +697,7 @@ export default async function CommandCenterPage({
                   <CardTitle>Библиотека материалов</CardTitle>
                   <CardAction><FileTextIcon className="size-4 text-muted-foreground" /></CardAction>
                 </CardHeader>
-                <CardContent><MaterialTable materials={state.materials} /></CardContent>
+                <CardContent><MaterialLibrary materials={state.materials} /></CardContent>
               </Card>
             </>
           ) : null}

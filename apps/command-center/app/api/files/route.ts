@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const rawPath = url.searchParams.get("path");
-  if (!rawPath) return new Response("Missing artifact path", { status: 400 });
+  if (!rawPath) return new Response("Missing file path", { status: 400 });
 
   try {
     const file = await readAllowedFile(rawPath);
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Artifact not found";
+    const message = error instanceof Error ? error.message : "File not found";
     return new Response(message, { status: message.includes("outside") ? 403 : 404 });
   }
 }

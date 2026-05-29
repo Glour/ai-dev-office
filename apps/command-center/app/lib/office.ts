@@ -16,6 +16,7 @@ import type {
   TaskState,
 } from "./types";
 import { encryptSecret, getSecretsKeyStatus } from "./secrets";
+import { contentTypeForFile, publicFileUri, writeAllowedTextFile } from "./file-access";
 
 const execFileAsync = promisify(execFile);
 const runtimeArtifactRoot = process.env.COMMAND_CENTER_ARTIFACT_DIR ?? "/root/home/ai-dev-office/artifacts";
@@ -380,17 +381,7 @@ function hermesKanbanPath() {
 }
 
 function contentTypeForArtifact(filePath: string) {
-  const ext = path.extname(filePath).toLowerCase();
-  if ([".png"].includes(ext)) return "image/png";
-  if ([".jpg", ".jpeg"].includes(ext)) return "image/jpeg";
-  if ([".gif"].includes(ext)) return "image/gif";
-  if ([".webp"].includes(ext)) return "image/webp";
-  if ([".avif"].includes(ext)) return "image/avif";
-  if ([".md", ".markdown"].includes(ext)) return "text/markdown";
-  if ([".json"].includes(ext)) return "application/json";
-  if ([".txt", ".log"].includes(ext)) return "text/plain";
-  if ([".pdf"].includes(ext)) return "application/pdf";
-  return "application/octet-stream";
+  return contentTypeForFile(filePath).replace("; charset=utf-8", "");
 }
 
 function artifactSortWeight(artifact: ArtifactState) {
@@ -420,7 +411,7 @@ async function walkArtifactPath(filePath: string, taskId: string, limit: number)
         id: `runtime-${taskId}-${Buffer.from(filePath).toString("base64url")}`,
         title: path.basename(filePath),
         type: "runtime_artifact",
-        uri: `/api/runtime-artifacts?path=${encodeURIComponent(filePath)}`,
+        uri: publicFileUri(filePath),
         contentType: contentTypeForArtifact(filePath),
         size: info.size,
         createdAt: info.mtime.toISOString(),
@@ -942,8 +933,8 @@ async function loadDatabaseState() {
           id: artifact.id,
           title: artifact.title,
           type: artifact.artifact_type,
-          uri: artifact.uri,
-          contentType: artifact.content_type ?? undefined,
+          uri: publicFileUri(artifact.uri),
+          contentType: artifact.content_type ?? (artifact.uri.startsWith("/root/") ? contentTypeForArtifact(artifact.uri) : undefined),
           size: artifact.size ? Number(artifact.size) : undefined,
           createdAt: artifact.created_at,
         }))).concat(runtimeArtifacts),
@@ -965,6 +956,8 @@ async function loadDatabaseState() {
       status: material.status,
       version: material.version,
       storageUri: material.storage_uri,
+      publicUri: publicFileUri(material.storage_uri),
+      contentType: material.storage_uri.startsWith("/root/") ? contentTypeForArtifact(material.storage_uri) : undefined,
       sourceSummary: material.source_summary ?? undefined,
       updatedAt: material.updated_at,
     })),
@@ -1437,6 +1430,45 @@ export async function createMaterial(input: {
   `, [rows[0]?.id]);
 
   return rows[0];
+}
+
+export async function updateMaterial(input: {
+  id: string;
+  title: string;
+  status: string;
+  sourceSummary: string;
+  content?: string;
+}) {
+  const rows = await queryRows<{ id: string; storage_uri: string }>(`
+    SELECT id::text, storage_uri
+    FROM materials
+    WHERE id = $1::uuid
+    LIMIT 1
+  `, [input.id]);
+  const material = rows[0];
+  if (!material) throw new Error("Material not found");
+
+  if (typeof input.content === "string") {
+    await writeAllowedTextFile(material.storage_uri, input.content);
+  }
+
+  const updated = await queryRows<{ id: string }>(`
+    UPDATE materials
+    SET title = $2,
+        status = $3,
+        source_summary = $4,
+        updated_at = now(),
+        metadata = metadata || jsonb_build_object('edited_at', now(), 'edited_by', 'command-center')
+    WHERE id = $1::uuid
+    RETURNING id::text
+  `, [input.id, input.title, input.status, input.sourceSummary || null]);
+
+  await queryRows(`
+    INSERT INTO events (event_type, actor, severity, message, payload)
+    VALUES ('material.updated', 'command-center', 'info', 'Материал обновлен в библиотеке', jsonb_build_object('material_id', $1::text))
+  `, [input.id]);
+
+  return updated[0];
 }
 
 export async function createArtifact(input: {
