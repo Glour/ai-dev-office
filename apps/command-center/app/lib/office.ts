@@ -247,6 +247,7 @@ async function createHermesKanbanTask(input: {
   routeType: string;
   priority: string;
   steps: RouteStep[];
+  idempotencyKey?: string;
 }) {
   const hermesHome = process.env.HERMES_RUNTIME_HOME ?? `${process.env.HOME ?? "/root"}/.hermes-ai-dev-office`;
   const priorityMap: Record<string, string> = {
@@ -277,7 +278,7 @@ async function createHermesKanbanTask(input: {
     "--priority",
     priorityMap[input.priority] ?? "0",
     "--idempotency-key",
-    `command-center:${input.taskId}`,
+    input.idempotencyKey ?? `command-center:${input.taskId}`,
     "--created-by",
     "command-center",
     "--json",
@@ -344,6 +345,24 @@ function commandCenterStatusFromHermes(status: string) {
   if (["running", "in_progress"].includes(normalized)) return "running";
   if (["review", "qc"].includes(normalized)) return normalized;
   return "planned";
+}
+
+function requiresOwnerAction(value?: string | null) {
+  if (!value) return false;
+  const normalized = value.toLowerCase();
+  return [
+    "тестов",
+    "аккаунт",
+    "доступ",
+    "cookie",
+    "session",
+    "cloudflare",
+    "whitelist",
+    "логин",
+    "парол",
+    "credentials",
+    "access",
+  ].some((marker) => normalized.includes(marker));
 }
 
 function isActiveHermesStatus(status: string) {
@@ -551,12 +570,15 @@ async function syncHermesKanbanState() {
     const snapshot = snapshots[task.hermes_id];
     if (!snapshot) continue;
 
-    const nextStatus = commandCenterStatusFromHermes(snapshot.status);
     const activeHermesTask = isActiveHermesStatus(snapshot.status);
     const rawSummary = snapshot.summary?.slice(0, 2000) ?? null;
     const rawResult = snapshot.result?.slice(0, 12000) ?? rawSummary;
     const summary = activeHermesTask && isHermesRuntimeNoise(rawSummary) ? null : rawSummary;
     const result = activeHermesTask && isHermesRuntimeNoise(rawResult) ? null : rawResult;
+    const baseStatus = commandCenterStatusFromHermes(snapshot.status);
+    const nextStatus = baseStatus === "blocked" && requiresOwnerAction(`${summary ?? ""}\n${result ?? ""}`)
+      ? "waiting_owner"
+      : baseStatus;
     const changed = task.status !== nextStatus
       || task.hermes_status !== snapshot.status
       || (task.hermes_summary ?? null) !== summary
@@ -578,7 +600,7 @@ async function syncHermesKanbanState() {
       WHERE id = $1::uuid
     `, [task.id, nextStatus, snapshot.assignee ?? null, snapshot.status, summary, result]);
 
-    if (nextStatus === "blocked") {
+    if (nextStatus === "blocked" || nextStatus === "waiting_owner") {
       await queryRows(`
         UPDATE task_steps
         SET status = 'blocked',
@@ -589,11 +611,11 @@ async function syncHermesKanbanState() {
 
       await queryRows(`
         UPDATE agent_runs
-        SET status = 'failed',
+        SET status = $2,
             completed_at = COALESCE(completed_at, now()),
-            error = COALESCE($2::text, 'Hermes Kanban blocked the task')
+            error = COALESCE($3::text, 'Hermes Kanban paused the task')
         WHERE task_id = $1::uuid AND status = 'running'
-      `, [task.id, result ?? summary]);
+      `, [task.id, nextStatus === "waiting_owner" ? "cancelled" : "failed", result ?? summary]);
     }
 
     if (nextStatus === "done") {
@@ -620,14 +642,18 @@ async function syncHermesKanbanState() {
         $1::uuid,
         'hermes.kanban.synced',
         'command-center',
-        CASE WHEN $2 = 'blocked' THEN 'warn' ELSE 'info' END,
+        CASE WHEN $2 IN ('blocked', 'waiting_owner') THEN 'warn' ELSE 'info' END,
         $3,
         jsonb_build_object('hermes_task_id', $4::text, 'hermes_status', $5::text, 'summary', $6::text, 'result', $7::text)
       )
     `, [
       task.id,
       nextStatus,
-      nextStatus === "blocked" ? "Hermes Kanban заблокировал задачу" : "Статус синхронизирован из Hermes Kanban",
+      nextStatus === "waiting_owner"
+        ? "Задача ожидает действия владельца"
+        : nextStatus === "blocked"
+          ? "Hermes Kanban заблокировал задачу"
+          : "Статус синхронизирован из Hermes Kanban",
       task.hermes_id,
       snapshot.status,
       summary,
@@ -1215,7 +1241,7 @@ export async function updateTaskStatus(input: {
   taskId: string;
   status: string;
 }) {
-  const allowed = new Set(["new", "planned", "running", "blocked", "review", "qc", "done", "archived", "cancelled", "failed", "rejected"]);
+  const allowed = new Set(["new", "planned", "running", "waiting_owner", "blocked", "review", "qc", "done", "archived", "cancelled", "failed", "rejected"]);
   if (!allowed.has(input.status)) {
     throw new Error(`Unsupported task status: ${input.status}`);
   }
@@ -1237,6 +1263,119 @@ export async function updateTaskStatus(input: {
   `, [input.taskId, input.status]);
 
   return rows[0];
+}
+
+export async function resumeTaskWithOwnerInput(input: {
+  taskId: string;
+  ownerInput: string;
+}) {
+  const ownerInput = input.ownerInput.trim();
+  if (!ownerInput) throw new Error("Owner input is required");
+
+  const client = await getPool().connect();
+  let committed = false;
+  try {
+    await client.query("BEGIN");
+
+    const task = await client.query<{
+      id: string;
+      owner_request: string;
+      route_type: string;
+      assigned_agent: string;
+      priority: string;
+    }>(`
+      SELECT id::text, owner_request, route_type, assigned_agent, priority
+      FROM tasks
+      WHERE id = $1::uuid
+      LIMIT 1
+    `, [input.taskId]);
+    const row = task.rows[0];
+    if (!row) throw new Error("Task not found");
+
+    const stepResult = await client.query<{ id: string }>(`
+      INSERT INTO task_steps (task_id, step_order, title, status, assigned_agent, tool_name, input, started_at)
+      VALUES (
+        $1::uuid,
+        COALESCE((SELECT max(step_order) + 1 FROM task_steps WHERE task_id = $1::uuid), 1),
+        'Доработка с данными владельца',
+        'running',
+        $2,
+        'hermes-profile',
+        jsonb_build_object('owner_input', $3::text, 'route_type', $4::text),
+        now()
+      )
+      RETURNING id::text
+    `, [input.taskId, row.assigned_agent || "owner-assistant", ownerInput, row.route_type]);
+    const stepId = stepResult.rows[0]?.id;
+    if (!stepId) throw new Error("Follow-up step was not created");
+
+    await client.query(`
+      INSERT INTO agent_runs (task_id, step_id, agent_id, tool_name, status, input)
+      VALUES ($1::uuid, $2::uuid, $3, 'hermes-profile', 'running', jsonb_build_object('owner_input', $4::text, 'route_type', $5::text))
+    `, [input.taskId, stepId, row.assigned_agent || "owner-assistant", ownerInput, row.route_type]);
+
+    await client.query(`
+      UPDATE tasks
+      SET status = 'running',
+          updated_at = now(),
+          completed_at = NULL,
+          metadata = metadata
+            - 'hermes_summary'
+            - 'hermes_result'
+            - 'hermes_status'
+            || jsonb_build_object(
+              'owner_followup_at', now(),
+              'owner_followups', COALESCE(metadata->'owner_followups', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('created_at', now(), 'body', $2::text))
+            )
+      WHERE id = $1::uuid
+    `, [input.taskId, ownerInput]);
+
+    await client.query(`
+      INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+      VALUES ($1::uuid, 'owner.input.provided', 'owner', 'info', 'Владелец предоставил данные и отправил задачу на доработку', jsonb_build_object('owner_input', $2::text))
+    `, [input.taskId, ownerInput]);
+
+    await client.query("COMMIT");
+    committed = true;
+
+    const body = [
+      row.owner_request,
+      "",
+      "Дополнение владельца для повторной доработки:",
+      ownerInput,
+      "",
+      "Продолжи задачу с учетом новых данных. Если это cookie/login/session/доступ, используй его только для этой задачи, не печатай секреты в ответ и не сохраняй открытый текст в артефактах.",
+    ].join("\n");
+    const steps: RouteStep[] = [{ title: "Доработка с данными владельца", assignedAgent: row.assigned_agent || "owner-assistant", toolName: "hermes-profile" }];
+    const hermes = await createHermesKanbanTask({
+      taskId: input.taskId,
+      title: `Доработка: ${row.owner_request.split("\n")[0]?.slice(0, 80) || input.taskId}`,
+      body,
+      assignee: row.assigned_agent || "owner-assistant",
+      routeType: row.route_type,
+      priority: row.priority,
+      steps,
+      idempotencyKey: `command-center:${input.taskId}:owner-followup:${Date.now()}`,
+    });
+
+    await queryRows(`
+      UPDATE tasks
+      SET metadata = metadata || jsonb_build_object('hermes_kanban_task_id', $2::text, 'hermes_dispatch_at', now(), 'hermes_resumed_at', now())
+      WHERE id = $1::uuid
+    `, [input.taskId, hermes.hermesTaskId]);
+
+    await queryRows(`
+      INSERT INTO events (task_id, event_type, actor, severity, message, payload)
+      VALUES ($1::uuid, 'hermes.kanban.redispatched', 'command-center', 'info', 'Задача повторно отправлена в Hermes Kanban', jsonb_build_object('hermes_task_id', $2::text, 'dispatch', $3::jsonb))
+    `, [input.taskId, hermes.hermesTaskId, JSON.stringify(hermes.dispatch ?? {})]);
+
+    return { id: input.taskId };
+  } catch (error) {
+    if (!committed) await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function archiveTask(taskId: string) {

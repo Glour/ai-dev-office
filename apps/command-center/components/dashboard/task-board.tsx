@@ -24,7 +24,7 @@ const boardColumns = [
   { id: "review", title: "Review", hint: "Код, логика или результат на проверке", states: ["review"], targetStatus: "review" },
   { id: "qc", title: "QC", hint: "Финальный контроль качества", states: ["qc"], targetStatus: "qc" },
   { id: "done", title: "Готово", hint: "Закрытые и отданные результаты", states: ["done", "verified"], targetStatus: "done" },
-  { id: "blocked", title: "Блокеры", hint: "Нужна реакция владельца", states: ["blocked", "failed"], targetStatus: "blocked" },
+  { id: "blocked", title: "Ожидает владельца", hint: "Нужна реакция владельца", states: ["waiting_owner", "blocked", "failed"], targetStatus: "waiting_owner" },
 ];
 
 type BoardColumn = typeof boardColumns[number];
@@ -45,6 +45,7 @@ const statusLabels: Record<string, string> = {
   new: "новая",
   planned: "запланирована",
   running: "в работе",
+  waiting_owner: "требуется действие владельца",
   blocked: "блокер",
   review: "review",
   qc: "QC",
@@ -77,7 +78,7 @@ function formatDate(value?: string) {
 
 function toneClass(status: string) {
   if (["done", "verified", "passed"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (["running", "qc", "review", "new", "planned"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (["running", "qc", "review", "new", "planned", "waiting_owner"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
   if (["blocked", "failed"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
   if (status === "rejected") return "border-slate-200 bg-slate-50 text-slate-600";
   return "border-border bg-muted text-muted-foreground";

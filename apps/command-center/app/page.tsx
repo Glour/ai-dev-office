@@ -67,6 +67,7 @@ const statusLabels: Record<string, string> = {
   new: "новая",
   planned: "запланирована",
   running: "в работе",
+  waiting_owner: "требуется действие владельца",
   blocked: "блокер",
   review: "review",
   qc: "QC",
@@ -129,7 +130,7 @@ function formatDate(value?: string) {
 
 function toneClass(status: string) {
   if (["active", "done", "verified", "passed"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (["running", "qc", "review", "new", "planned"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (["running", "qc", "review", "new", "planned", "waiting_owner"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
   if (["blocked", "failed", "inactive"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
   if (status === "rejected") return "border-slate-200 bg-slate-50 text-slate-600";
   return "border-border bg-muted text-muted-foreground";

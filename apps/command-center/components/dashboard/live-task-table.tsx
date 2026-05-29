@@ -22,6 +22,7 @@ const statusLabels: Record<string, string> = {
   new: "новая",
   planned: "запланирована",
   running: "в работе",
+  waiting_owner: "требуется действие владельца",
   blocked: "блокер",
   review: "review",
   qc: "QC",
@@ -56,7 +57,7 @@ function formatDate(value?: string) {
 
 function toneClass(status: string) {
   if (["done", "verified", "passed"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (["running", "qc", "review", "new", "planned"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (["running", "qc", "review", "new", "planned", "waiting_owner"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
   if (["blocked", "failed"].includes(status)) return "border-red-200 bg-red-50 text-red-700";
   if (status === "rejected") return "border-slate-200 bg-slate-50 text-slate-600";
   return "border-border bg-muted text-muted-foreground";
@@ -65,7 +66,7 @@ function toneClass(status: string) {
 function statusIcon(status: string) {
   if (["running", "review", "qc"].includes(status)) return <Loader2Icon className="size-3 animate-spin" />;
   if (["done", "verified"].includes(status)) return <CheckCircle2Icon className="size-3" />;
-  if (["blocked", "failed"].includes(status)) return <CircleDashedIcon className="size-3" />;
+  if (["blocked", "failed", "waiting_owner"].includes(status)) return <CircleDashedIcon className="size-3" />;
   if (status === "rejected") return <XIcon className="size-3" />;
   return <Clock3Icon className="size-3" />;
 }
@@ -207,7 +208,7 @@ export function LiveTaskTable({
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                         <div
-                          className={`h-full rounded-full transition-all ${["blocked", "failed"].includes(task.status) ? "bg-red-400" : task.status === "rejected" ? "bg-slate-300" : "bg-emerald-400"}`}
+                          className={`h-full rounded-full transition-all ${["blocked", "failed"].includes(task.status) ? "bg-red-400" : task.status === "waiting_owner" ? "bg-amber-400" : task.status === "rejected" ? "bg-slate-300" : "bg-emerald-400"}`}
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -324,6 +325,10 @@ function TaskDetailsModal({
             )}
           </DetailBlock>
 
+          {task.status === "waiting_owner" ? (
+            <OwnerFollowupForm taskId={task.id} />
+          ) : null}
+
           <DetailBlock title="Артефакты">
             <ArtifactGallery artifacts={task.artifacts} />
           </DetailBlock>
@@ -377,6 +382,31 @@ function TaskDetailsModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function OwnerFollowupForm({ taskId }: { taskId: string }) {
+  return (
+    <section className="min-w-0 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+      <h3 className="text-sm font-semibold text-amber-900">Требуется действие владельца</h3>
+      <p className="mt-1 text-sm leading-6 text-amber-900/75">
+        Добавьте доступ, cookie/session, тестовый аккаунт, whitelist или уточнение. После отправки задача вернется в работу с учетом новых данных.
+      </p>
+      <form action="/api/tasks/action" className="mt-3 grid gap-3" method="post">
+        <input name="taskId" type="hidden" value={taskId} />
+        <input name="action" type="hidden" value="owner_followup" />
+        <input name="redirect" type="hidden" value="/?view=tasks" />
+        <textarea
+          className="min-h-28 w-full resize-y rounded-lg border border-amber-200 bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-amber-400 focus-visible:ring-3 focus-visible:ring-amber-200"
+          name="ownerInput"
+          placeholder="Например: тестовый логин/пароль, cookie, session token, IP whitelist, разрешение создать аккаунт или уточнение по задаче..."
+          required
+        />
+        <div className="flex justify-end">
+          <Button type="submit">Отправить на доработку</Button>
+        </div>
+      </form>
+    </section>
   );
 }
 
