@@ -8,6 +8,11 @@ import type { ArtifactState } from "@/app/lib/types";
 import { Button } from "@/components/ui/button";
 import { MarkdownView } from "@/components/dashboard/markdown-view";
 
+type ViewerState = {
+  artifacts: ArtifactState[];
+  index: number;
+};
+
 function isImageArtifact(artifact: ArtifactState) {
   return artifact.contentType?.startsWith("image/")
     || /\.(png|jpe?g|gif|webp|avif)$/i.test(artifact.uri)
@@ -35,10 +40,18 @@ function artifactKind(artifact: ArtifactState) {
 }
 
 export function ArtifactGallery({ artifacts }: { artifacts: ArtifactState[] }) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [viewerState, setViewerState] = useState<ViewerState | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  function openViewer(index: number) {
+    setViewerState({ artifacts: artifacts.slice(), index });
+  }
+
+  function changeViewerIndex(index: number) {
+    setViewerState((current) => current ? { ...current, index } : current);
+  }
 
   if (artifacts.length === 0) {
     return <p className="text-sm text-muted-foreground">Файлы, отчеты и скриншоты по этой задаче пока не прикреплены.</p>;
@@ -54,7 +67,7 @@ export function ArtifactGallery({ artifacts }: { artifacts: ArtifactState[] }) {
           {images.map((artifact) => {
             const index = artifacts.findIndex((item) => item.id === artifact.id);
             return (
-              <button className="group overflow-hidden rounded-xl border bg-background text-left" key={artifact.id} onClick={() => setSelectedIndex(index)} type="button">
+              <button className="group overflow-hidden rounded-xl border bg-background text-left" key={artifact.id} onClick={() => openViewer(index)} type="button">
                 <div className="aspect-video bg-muted">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img alt={artifact.title} className="size-full object-cover transition group-hover:scale-[1.02]" src={artifact.uri} />
@@ -74,7 +87,7 @@ export function ArtifactGallery({ artifacts }: { artifacts: ArtifactState[] }) {
           {files.map((artifact) => {
             const index = artifacts.findIndex((item) => item.id === artifact.id);
             return (
-              <button className="flex min-w-0 items-center gap-3 rounded-xl border bg-background px-3 py-3 text-left text-sm transition hover:bg-muted/50" key={artifact.id} onClick={() => setSelectedIndex(index)} type="button">
+              <button className="flex min-w-0 items-center gap-3 rounded-xl border bg-background px-3 py-3 text-left text-sm transition hover:bg-muted/50" key={artifact.id} onClick={() => openViewer(index)} type="button">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                   <FileTextIcon className="size-4 text-muted-foreground" />
                 </span>
@@ -88,12 +101,12 @@ export function ArtifactGallery({ artifacts }: { artifacts: ArtifactState[] }) {
         </div>
       ) : null}
 
-      {mounted && selectedIndex !== null ? createPortal(
+      {mounted && viewerState ? createPortal(
         <ArtifactViewer
-          artifacts={artifacts}
-          index={selectedIndex}
-          onClose={() => setSelectedIndex(null)}
-          onIndexChange={setSelectedIndex}
+          artifacts={viewerState.artifacts}
+          index={viewerState.index}
+          onClose={() => setViewerState(null)}
+          onIndexChange={changeViewerIndex}
         />,
         document.body
       ) : null}
@@ -115,23 +128,25 @@ export function ArtifactViewer({
   onIndexChange: (index: number) => void;
 }) {
   const artifact = artifacts[index];
-  const [text, setText] = useState<string>("");
+  const artifactUri = artifact?.uri ?? "";
+  const [textByUri, setTextByUri] = useState<Record<string, string>>({});
   const [loadingText, setLoadingText] = useState(false);
+  const text = artifactUri ? textByUri[artifactUri] ?? "" : "";
+  const hasCachedText = artifactUri ? Object.prototype.hasOwnProperty.call(textByUri, artifactUri) : false;
   const canPrev = index > 0;
   const canNext = index < artifacts.length - 1;
 
   useEffect(() => {
     let cancelled = false;
-    setText("");
-    if (!artifact || !isTextArtifact(artifact)) return;
+    if (!artifact || !artifactUri || !isTextArtifact(artifact) || hasCachedText) return;
     setLoadingText(true);
-    fetch(artifact.uri, { cache: "no-store" })
+    fetch(artifactUri, { cache: "no-store" })
       .then((response) => response.ok ? response.text() : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then((body) => {
-        if (!cancelled) setText(body);
+        if (!cancelled) setTextByUri((current) => ({ ...current, [artifactUri]: body }));
       })
       .catch((error: Error) => {
-        if (!cancelled) setText(`Не удалось загрузить файл: ${error.message}`);
+        if (!cancelled) setTextByUri((current) => ({ ...current, [artifactUri]: `Не удалось загрузить файл: ${error.message}` }));
       })
       .finally(() => {
         if (!cancelled) setLoadingText(false);
@@ -139,7 +154,7 @@ export function ArtifactViewer({
     return () => {
       cancelled = true;
     };
-  }, [artifact]);
+  }, [artifact, artifactUri, hasCachedText]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
